@@ -21,6 +21,7 @@
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
   <style>
     #reader {
       border: 1px solid #e5e7eb !important;
@@ -106,6 +107,23 @@
       aria-label="TRADIFOOT Scanner Zoning"
       class="relative w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-sm p-4 flex flex-col transition-colors duration-200"
     >
+      <!-- Top-Left Admin Stealth Excel Export Button -->
+      <button
+        id="export-btn"
+        type="button"
+        title="Exporter vers Excel (.xlsx)"
+        aria-label="Exporter vers Excel"
+        class="absolute top-3 left-3 text-slate-300 hover:text-slate-600 transition-colors cursor-pointer p-1 touch-manipulation"
+      >
+        <svg id="export-icon-download" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" />
+        </svg>
+        <svg id="export-icon-spinner" xmlns="http://www.w3.org/2000/svg" class="hidden animate-spin w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+      </button>
+
       <!-- Top-Right Micro-Status Indicator -->
       <div
         id="db-status"
@@ -441,6 +459,9 @@
       const brandLogo = document.getElementById("brand-logo");
       const brandFallback = document.getElementById("brand-fallback");
       const mainCard = document.getElementById("main-card");
+      const exportBtn = document.getElementById("export-btn");
+      const exportIconDownload = document.getElementById("export-icon-download");
+      const exportIconSpinner = document.getElementById("export-icon-spinner");
       const dbStatusEl = document.getElementById("db-status");
       const screenFlashEl = document.getElementById("screen-flash");
 
@@ -1417,6 +1438,166 @@
           startCamera();
         }
       });
+
+      /**
+       * =========================================================================
+       * 8. ADMIN EXCEL EXPORT (.xlsx via SheetJS)
+       * =========================================================================
+       */
+      const EXPORT_BTN_IDLE_CLASS =
+        "absolute top-3 left-3 text-slate-300 hover:text-slate-600 transition-colors cursor-pointer p-1 touch-manipulation";
+      const EXPORT_BTN_LOADING_CLASS =
+        "absolute top-3 left-3 text-blue-500 transition-colors cursor-wait p-1 touch-manipulation";
+      const EXPORT_BTN_SUCCESS_CLASS =
+        "absolute top-3 left-3 text-green-500 transition-colors cursor-pointer p-1 touch-manipulation";
+
+      let isExporting = false;
+      let exportSuccessTimer = null;
+
+      function setExportButtonVisual(mode) {
+        if (exportSuccessTimer !== null) {
+          clearTimeout(exportSuccessTimer);
+          exportSuccessTimer = null;
+        }
+
+        if (mode === "loading") {
+          exportBtn.disabled = true;
+          exportBtn.className = EXPORT_BTN_LOADING_CLASS;
+          exportIconDownload.classList.add("hidden");
+          exportIconSpinner.classList.remove("hidden");
+          return;
+        }
+
+        exportIconSpinner.classList.add("hidden");
+        exportIconDownload.classList.remove("hidden");
+        exportBtn.disabled = false;
+
+        if (mode === "success") {
+          exportBtn.className = EXPORT_BTN_SUCCESS_CLASS;
+          exportSuccessTimer = setTimeout(() => {
+            exportSuccessTimer = null;
+            if (!isExporting) {
+              exportBtn.className = EXPORT_BTN_IDLE_CLASS;
+            }
+          }, 1000);
+        } else {
+          exportBtn.className = EXPORT_BTN_IDLE_CLASS;
+        }
+      }
+
+      async function fetchAllZoningRecords() {
+        const PAGE_SIZE = 1000;
+
+        async function fetchChunk(from, to, withCount = false) {
+          const selectQuery = withCount
+            ? supabaseClient
+                .from("warehouse_zoning")
+                .select("barcode, sku, zone, last_updated_at", { count: "exact" })
+            : supabaseClient
+                .from("warehouse_zoning")
+                .select("barcode, sku, zone, last_updated_at");
+
+          const { data, error, count } = await selectQuery
+            .order("zone", { ascending: true })
+            .order("barcode", { ascending: true })
+            .range(from, to);
+
+          if (error) throw error;
+          return {
+            rows: Array.isArray(data) ? data : [],
+            count: typeof count === "number" ? count : null
+          };
+        }
+
+        const first = await fetchChunk(0, PAGE_SIZE - 1, true);
+        const allRows = [...first.rows];
+
+        if (first.rows.length === 0) {
+          return allRows;
+        }
+
+        const step = first.rows.length;
+        if (first.count !== null) {
+          if (allRows.length >= first.count) {
+            return allRows;
+          }
+          const remainingOffsets = [];
+          for (let offset = step; offset < first.count; offset += step) {
+            remainingOffsets.push(offset);
+          }
+
+          const CONCURRENCY = 4;
+          for (let i = 0; i < remainingOffsets.length; i += CONCURRENCY) {
+            const batch = remainingOffsets.slice(i, i + CONCURRENCY);
+            const pages = await Promise.all(
+              batch.map((offset) => fetchChunk(offset, offset + step - 1, false))
+            );
+            for (const page of pages) {
+              allRows.push(...page.rows);
+            }
+          }
+          return allRows;
+        }
+
+        if (first.rows.length < PAGE_SIZE) {
+          return allRows;
+        }
+
+        let offset = step;
+        while (true) {
+          const next = await fetchChunk(offset, offset + step - 1, false);
+          allRows.push(...next.rows);
+          if (next.rows.length < step) break;
+          offset += next.rows.length;
+        }
+        return allRows;
+      }
+
+      async function exportToExcel() {
+        if (isExporting) return;
+
+        AudioFeedback.unlock();
+        exportBtn.blur();
+
+        if (!supabaseClient || !isSupabaseConfigured) {
+          alert("Client Supabase non configuré.");
+          setExportButtonVisual("idle");
+          return;
+        }
+
+        if (typeof XLSX === "undefined") {
+          alert("Bibliothèque SheetJS (XLSX) indisponible.");
+          setExportButtonVisual("idle");
+          return;
+        }
+
+        isExporting = true;
+        setExportButtonVisual("loading");
+
+        try {
+          const data = await fetchAllZoningRecords();
+          const worksheet = XLSX.utils.json_to_sheet(data);
+          const workbook = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(workbook, worksheet, "Zoning");
+          XLSX.writeFile(workbook, "Tradifoot_Zoning_Live.xlsx");
+
+          AudioFeedback.playSuccess();
+          setExportButtonVisual("success");
+        } catch (err) {
+          console.error("Erreur export Excel:", err);
+          setExportButtonVisual("idle");
+          AudioFeedback.playError();
+          alert(`Erreur lors de l'export Excel : ${err?.message || "Erreur inconnue"}`);
+        } finally {
+          isExporting = false;
+          if (state.mode === MODE.LOOKUP && !state.isCameraActive) {
+            focusScannerInput();
+          }
+        }
+      }
+      window.exportToExcel = exportToExcel;
+
+      exportBtn.addEventListener("click", exportToExcel);
 
       document.addEventListener("click", (e) => {
         AudioFeedback.unlock();
