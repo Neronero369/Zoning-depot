@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SARL TRADIFOOT — WMS Scanner Excel Standalone</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    #reader {
+      border: 2px solid #cbd5e1 !important;
+      background-color: #0f172a;
+      color: #f8fafc;
+    }
+    #reader img {
+      display: inline-block;
+    }
+    #reader__dashboard_section_csr button,
+    #reader__dashboard_section_fsr button,
+    #reader button {
+      background-color: #2563eb !important;
+      color: #ffffff !important;
+      border: none !important;
+      border-radius: 0.5rem !important;
+      padding: 0.6rem 1rem !important;
+      font-weight: 700 !important;
+      font-size: 0.95rem !important;
+      cursor: pointer !important;
+      margin: 0.35rem 0.25rem !important;
+      touch-action: manipulation;
+    }
+    #reader select {
+      background-color: #1e293b !important;
+      color: #f8fafc !important;
+      border: 1px solid #475569 !important;
+      border-radius: 0.5rem !important;
+      padding: 0.5rem 0.75rem !important;
+      font-size: 0.95rem !important;
+      max-width: 100%;
+    }
+    #reader a {
+      color: #60a5fa !important;
+      text-decoration: underline !important;
+    }
+    #reader__scan_region video {
+      border-radius: 0.5rem;
+      object-fit: cover;
+    }
+    @keyframes scanFlash {
+      0% { transform: scale(0.985); }
+      50% { transform: scale(1.01); }
+      100% { transform: scale(1); }
+    }
+    .animate-scan-flash {
+      animation: scanFlash 220ms ease-out;
+    }
+    @keyframes shrinkBar {
+      from { width: 100%; }
+      to { width: 0%; }
+    }
+    .animate-countdown {
+      animation: shrinkBar 3000ms linear forwards;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-900 min-h-screen flex flex-col antialiased">
+
+  <!-- Top Header -->
+  <header class="w-full bg-slate-950 text-white border-b border-slate-800 sticky top-0 z-20">
+    <div class="max-w-xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-green-600 text-white font-black text-sm tracking-tight">TF</span>
+          <h1 class="text-lg sm:text-xl font-black tracking-tight leading-none">
+            SARL TRADIFOOT
+          </h1>
+        </div>
+        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400 mt-1">
+          WMS • Scanner Zoning Excel
+        </p>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <div
+          id="mode-badge"
+          class="hidden inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border border-green-500/40 bg-green-500/15 text-green-400"
+        >
+          <span id="mode-dot" class="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse"></span>
+          <span id="mode-label">Douchette USB</span>
+        </div>
+
+        <button
+          id="sound-toggle-btn"
+          type="button"
+          aria-label="Activer ou couper le son"
+          title="Son activé"
+          class="p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 transition touch-manipulation"
+        >
+          <svg id="icon-sound-on" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14" />
+          </svg>
+          <svg id="icon-sound-off" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-slate-400 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M23 9l-6 6M17 9l6 6" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 w-full max-w-xl mx-auto px-4 py-5 flex flex-col gap-4">
+
+    <!-- ===================================================================== -->
+    <!-- SECTION 1: EXCEL FILE INGESTION (Visible until file is loaded)        -->
+    <!-- ===================================================================== -->
+    <section
+      id="upload-section"
+      aria-label="Importation du fichier Excel"
+      class="bg-white rounded-3xl border-2 border-slate-200 p-6 sm:p-8 shadow-2xl flex flex-col gap-5"
+    >
+      <div class="text-center">
+        <div class="mx-auto w-16 h-16 rounded-2xl bg-green-50 border-2 border-green-200 flex items-center justify-center text-green-600 mb-3">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-9 h-9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <h2 class="text-2xl font-black text-slate-900">Charger le fichier Zoning</h2>
+        <p class="text-sm text-gray-600 mt-1">
+          Sélectionnez le fichier Excel (<span class="font-mono font-semibold">.xlsx</span> / <span class="font-mono font-semibold">.xls</span>) contenant les colonnes Code-barres, SKU et Zone.
+        </p>
+      </div>
+
+      <label
+        id="drop-zone"
+        for="excel-upload"
+        class="cursor-pointer rounded-2xl border-2 border-dashed border-slate-300 hover:border-green-600 hover:bg-green-50/40 bg-slate-50 p-6 text-center transition flex flex-col items-center gap-3"
+      >
+        <span class="px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-extrabold text-sm sm:text-base shadow">
+          Choisir un fichier Excel
+        </span>
+        <span class="text-xs text-gray-500">
+          ou glisser-déposer le fichier ici (traitement 100% local, sans serveur)
+        </span>
+        <input
+          type="file"
+          id="excel-upload"
+          accept=".xlsx, .xls"
+          class="sr-only"
+        />
+      </label>
+
+      <div id="upload-loading" class="hidden flex items-center justify-center gap-3 py-2 text-slate-700 font-bold text-sm">
+        <div class="w-5 h-5 rounded-full border-2 border-slate-300 border-t-green-600 animate-spin"></div>
+        <span>Lecture et indexation des codes-barres en cours...</span>
+      </div>
+
+      <div id="upload-error" class="hidden rounded-xl bg-red-50 border border-red-300 p-3 text-sm font-bold text-red-700 text-center"></div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- SECTION 2: SCANNER UI (Revealed once Excel is loaded into memory)     -->
+    <!-- ===================================================================== -->
+    <div id="scanner-section" class="hidden flex flex-col gap-4">
+
+      <!-- Loaded File Summary Banner -->
+      <div class="bg-slate-800/90 text-white border border-slate-700 rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <p id="loaded-file-name" class="text-sm font-bold text-green-400 truncate"></p>
+          <p id="loaded-file-stats" class="text-xs text-slate-300 truncate"></p>
+        </div>
+        <button
+          id="change-file-btn"
+          type="button"
+          class="shrink-0 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-bold text-white border border-slate-600 transition touch-manipulation"
+        >
+          Changer Excel
+        </button>
+      </div>
+
+      <!-- Hybrid Input Bar (Auto-focused for USB Douchette + Manual Entry) -->
+      <section aria-label="Saisie code-barres" class="bg-white rounded-2xl border-2 border-slate-200 p-3 sm:p-4 shadow-lg">
+        <div class="flex items-center justify-between mb-2">
+          <label for="barcode-input" class="text-xs font-extrabold uppercase tracking-wider text-gray-700">
+            Douchette USB / Saisie manuelle
+          </label>
+          <span id="focus-indicator" class="text-xs font-bold text-green-600">
+            Focus auto actif
+          </span>
+        </div>
+
+        <form id="manual-scan-form" class="flex items-stretch gap-2" autocomplete="off">
+          <div class="relative flex-1">
+            <input
+              id="barcode-input"
+              name="barcode"
+              type="text"
+              inputmode="text"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder="Scanner une boîte ou saisir le code..."
+              class="w-full h-12 sm:h-14 pl-4 pr-10 rounded-xl bg-slate-50 border-2 border-slate-300 focus:border-green-600 focus:bg-white focus:outline-none text-slate-900 placeholder-slate-400 font-mono text-base sm:text-lg font-bold tracking-wide transition"
+            />
+            <button
+              id="clear-input-btn"
+              type="button"
+              aria-label="Effacer le champ"
+              class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <button
+            type="submit"
+            class="h-12 sm:h-14 px-4 sm:px-5 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-700 text-white font-extrabold text-sm sm:text-base tracking-wide transition touch-manipulation"
+          >
+            OK
+          </button>
+        </form>
+      </section>
+
+      <!-- Prominent Camera Toggle Button -->
+      <button
+        id="camera-toggle-btn"
+        type="button"
+        class="w-full min-h-[56px] py-3.5 px-5 rounded-2xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-black text-lg tracking-wide shadow-lg border-2 border-blue-400/30 flex items-center justify-center gap-3 transition touch-manipulation"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h2l1.5-2h7L17 7h2a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+          <circle cx="12" cy="13" r="3.5" />
+        </svg>
+        <span id="camera-btn-label">Ouvrir la Caméra</span>
+      </button>
+
+      <!-- High-Contrast Lookup Result Panel -->
+      <section
+        id="result-panel"
+        aria-live="polite"
+        class="relative overflow-hidden rounded-3xl border-4 border-slate-200 bg-white p-6 sm:p-8 text-center shadow-2xl transition-all"
+      >
+        <!-- Idle State -->
+        <div id="state-idle" class="py-5 flex flex-col items-center justify-center gap-2.5">
+          <div class="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-9 h-9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 7V5a1 1 0 011-1h2M17 4h2a1 1 0 011 1v2M4 17v2a1 1 0 001 1h2M17 20h2a1 1 0 001-1v-2M7 8v8M10 8v8M13 8v8M17 8v8" />
+            </svg>
+          </div>
+          <p class="text-xl sm:text-2xl font-black text-slate-900">Prêt à scanner</p>
+          <p class="text-sm text-gray-600 max-w-xs">
+            Scannez un code-barres avec la douchette USB ou ouvrez la caméra.
+          </p>
+        </div>
+
+        <!-- Found with Valid Zone -->
+        <div id="state-success" class="hidden py-2 flex flex-col items-center justify-center gap-2">
+          <span class="inline-block px-3 py-1 rounded-full bg-green-100 border border-green-300 text-green-800 text-xs font-extrabold uppercase tracking-widest">
+            Zone de Stockage
+          </span>
+          <p
+            id="result-zone"
+            class="text-6xl sm:text-7xl font-black text-green-600 tracking-tight break-words leading-none my-3"
+          ></p>
+          <div class="w-full pt-3 border-t border-slate-200 flex flex-col items-center gap-1">
+            <span class="text-xs font-bold uppercase tracking-widest text-gray-500">SKU</span>
+            <p id="result-sku" class="text-2xl sm:text-3xl font-extrabold text-gray-800 tracking-wide break-all"></p>
+            <p id="result-barcode" class="text-sm font-mono text-gray-500 mt-1"></p>
+          </div>
+        </div>
+
+        <!-- Found SKU but Empty Zone / NO ZONE -->
+        <div id="state-nozone" class="hidden py-2 flex flex-col items-center justify-center gap-2">
+          <span class="inline-block px-3 py-1 rounded-full bg-red-100 border border-red-300 text-red-800 text-xs font-extrabold uppercase tracking-widest">
+            Aucune Zone Attribuée
+          </span>
+          <p class="text-6xl sm:text-7xl font-black text-red-600 tracking-tight leading-none my-3">
+            NO ZONE
+          </p>
+          <div class="w-full pt-3 border-t border-red-200 flex flex-col items-center gap-1">
+            <span class="text-xs font-bold uppercase tracking-widest text-gray-500">SKU</span>
+            <p id="nozone-sku" class="text-2xl sm:text-3xl font-extrabold text-gray-800 tracking-wide break-all"></p>
+            <p id="nozone-barcode" class="text-sm font-mono text-gray-600 mt-1"></p>
+          </div>
+        </div>
+
+        <!-- Not Found -->
+        <div id="state-error" class="hidden py-3 flex flex-col items-center justify-center gap-2">
+          <span class="inline-block px-3 py-1 rounded-full bg-red-100 border border-red-300 text-red-800 text-xs font-extrabold uppercase tracking-widest">
+            Code-Barres Non Trouvé
+          </span>
+          <p class="text-6xl sm:text-7xl font-black text-red-600 tracking-tight leading-none my-3">
+            INCONNU
+          </p>
+          <p id="error-barcode" class="text-sm sm:text-base font-mono text-red-800 bg-red-100 px-3 py-1.5 rounded-lg border border-red-200"></p>
+        </div>
+
+        <!-- 3-Second Auto-Clear Progress Indicator -->
+        <div id="countdown-track" class="hidden absolute bottom-0 left-0 right-0 h-1.5 bg-slate-200">
+          <div id="countdown-bar" class="h-full bg-slate-500"></div>
+        </div>
+      </section>
+
+      <!-- Camera Scanner Container -->
+      <section
+        id="camera-section"
+        aria-label="Scanner Caméra"
+        class="hidden rounded-2xl border-2 border-blue-500 bg-slate-950 p-3 sm:p-4 shadow-xl text-white"
+      >
+        <div class="flex items-center justify-between gap-2 mb-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse"></span>
+            <h2 class="text-sm font-extrabold uppercase tracking-wider text-blue-300">
+              Caméra Active
+            </h2>
+          </div>
+          <button
+            id="switch-to-usb-btn"
+            type="button"
+            class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-bold text-slate-200 transition touch-manipulation"
+          >
+            Mode Douchette USB
+          </button>
+        </div>
+
+        <div id="reader" class="w-full rounded-xl overflow-hidden"></div>
+        <p id="camera-error" class="hidden mt-3 p-3 rounded-xl bg-red-950/70 border border-red-500/40 text-sm font-semibold text-red-300"></p>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="w-full max-w-xl mx-auto px-4 py-3 text-center text-xs text-slate-400">
+    SARL TRADIFOOT WMS • 100% Hors-ligne après chargement Excel
+  </footer>
+
+  <script>
+    (() => {
+      "use strict";
+
+      /**
+       * =========================================================================
+       * 1. IN-MEMORY INVENTORY DICTIONARY & EXCEL PARSER (SheetJS)
+       * =========================================================================
+       */
+      let inventoryMap = new Map();
+
+      /**
+       * Extract a worksheet cell strictly as a clean trimmed String.
+       * Prevents scientific notation (e.g. 8.05E+12), floats (.0), and custom
+       * number masks (e.g. "# ?/?") from corrupting numeric barcodes.
+       */
+      function extractCellAsString(cell) {
+        if (!cell) return "";
+        if (cell.t === "e") return "";
+
+        if (cell.t === "s" || cell.t === "str") {
+          return String(cell.v ?? "").trim();
+        }
+
+        if (cell.t === "n") {
+          const num = cell.v;
+          if (typeof num !== "number" || !Number.isFinite(num)) {
+            return String(cell.w ?? cell.v ?? "").trim();
+          }
+
+          // Preserve leading-zero numeric formats only if formatted text is strictly pure digits
+          const formatted = typeof cell.w === "string" ? cell.w.trim() : "";
+          if (/^\d+$/.test(formatted) && Number(formatted) === num) {
+            return formatted;
+          }
+
+          if (Math.abs(num) < 1e20) {
+            return Number.isInteger(num)
+              ? num.toFixed(0).trim()
+              : String(num).trim();
+          }
+
+          return num.toLocaleString("fullwide", { useGrouping: false }).trim();
+        }
+
+        return String(cell.w ?? cell.v ?? "").trim();
+      }
+
+      function normalizeHeaderName(name) {
+        return String(name ?? "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "");
+      }
+
+      /**
+       * Detects Barcode, SKU, and Zone column indices from row 1 headers,
+       * with heuristic fallback for non-standard sheets.
+       */
+      function detectColumns(sheet, range) {
+        const headerRow = range.s.r;
+        const headers = [];
+
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          const cell = sheet[XLSX.utils.encode_cell({ r: headerRow, c })];
+          headers.push({
+            colIndex: c,
+            raw: extractCellAsString(cell),
+            norm: normalizeHeaderName(extractCellAsString(cell))
+          });
+        }
+
+        let barcodeCol = -1;
+        let skuCol = -1;
+        let zoneCol = -1;
+
+        for (const h of headers) {
+          if (
+            barcodeCol === -1 &&
+            (h.norm.includes("barre") ||
+              h.norm.includes("barcode") ||
+              h.norm === "ean" ||
+              h.norm === "upc" ||
+              h.norm === "gtin" ||
+              h.norm === "cb")
+          ) {
+            barcodeCol = h.colIndex;
+          } else if (
+            skuCol === -1 &&
+            (h.norm.includes("sku") ||
+              h.norm.includes("article") ||
+              h.norm === "ref" ||
+              h.norm.includes("reference"))
+          ) {
+            skuCol = h.colIndex;
+          } else if (
+            zoneCol === -1 &&
+            (h.norm.includes("zone") ||
+              h.norm.includes("formule") ||
+              h.norm === "bin" ||
+              h.norm.includes("emplacement") ||
+              h.norm.includes("location"))
+          ) {
+            zoneCol = h.colIndex;
+          }
+        }
+
+        // Heuristic fallback if headers are missing or non-standard
+        if (barcodeCol === -1 && headers.length >= 2) {
+          // Sample first 15 rows to locate the column with mostly 8-14 digit numeric barcodes
+          let bestCol = range.s.c;
+          let bestScore = -1;
+          const sampleEnd = Math.min(range.e.r, headerRow + 15);
+          for (let c = range.s.c; c <= range.e.c; c++) {
+            let score = 0;
+            for (let r = headerRow + 1; r <= sampleEnd; r++) {
+              const val = extractCellAsString(sheet[XLSX.utils.encode_cell({ r, c })]);
+              if (/^\d{8,14}$/.test(val)) score++;
+            }
+            if (score > bestScore) {
+              bestScore = score;
+              bestCol = c;
+            }
+          }
+          barcodeCol = bestCol;
+        }
+
+        const remainingCols = headers
+          .map((h) => h.colIndex)
+          .filter((c) => c !== barcodeCol && c !== skuCol && c !== zoneCol);
+
+        if (skuCol === -1 && remainingCols.length > 0) {
+          skuCol = remainingCols.shift();
+        }
+        if (zoneCol === -1 && remainingCols.length > 0) {
+          zoneCol = remainingCols.shift();
+        }
+
+        const getLabel = (colIdx) =>
+          headers.find((h) => h.colIndex === colIdx)?.raw || `Col ${colIdx + 1}`;
+
+        return {
+          barcodeCol,
+          skuCol,
+          zoneCol,
+          labels: {
+            barcode: getLabel(barcodeCol),
+            sku: skuCol !== -1 ? getLabel(skuCol) : "—",
+            zone: zoneCol !== -1 ? getLabel(zoneCol) : "—"
+          }
+        };
+      }
+
+      function parseExcelWorkbook(arrayBuffer) {
+        if (typeof XLSX === "undefined") {
+          throw new Error("Librairie SheetJS introuvable. Vérifiez votre connexion Internet.");
+        }
+
+        const workbook = XLSX.read(arrayBuffer, { type: "array" });
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+          throw new Error("Le classeur Excel ne contient aucune feuille.");
+        }
+
+        const firstSheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[firstSheetName];
+        if (!sheet || !sheet["!ref"]) {
+          throw new Error(`La feuille "${firstSheetName}" est vide.`);
+        }
+
+        const range = XLSX.utils.decode_range(sheet["!ref"]);
+        const cols = detectColumns(sheet, range);
+
+        if (cols.barcodeCol === -1) {
+          throw new Error("Impossible d'identifier la colonne Code-barres dans la première feuille.");
+        }
+
+        const map = new Map();
+        let rowsProcessed = 0;
+
+        for (let r = range.s.r + 1; r <= range.e.r; r++) {
+          const barcodeCell = sheet[XLSX.utils.encode_cell({ r, c: cols.barcodeCol })];
+          const barcode = extractCellAsString(barcodeCell);
+          if (!barcode) continue;
+
+          const sku =
+            cols.skuCol !== -1
+              ? extractCellAsString(sheet[XLSX.utils.encode_cell({ r, c: cols.skuCol })])
+              : "";
+          const zone =
+            cols.zoneCol !== -1
+              ? extractCellAsString(sheet[XLSX.utils.encode_cell({ r, c: cols.zoneCol })])
+              : "";
+
+          rowsProcessed++;
+
+          const existing = map.get(barcode);
+          if (!existing) {
+            map.set(barcode, { sku, zone });
+          } else {
+            // Prefer an entry that actually carries a non-empty valid zone
+            const existingHasZone = existing.zone && existing.zone.toUpperCase() !== "NO ZONE";
+            const currentHasZone = zone && zone.toUpperCase() !== "NO ZONE";
+            if (!existingHasZone && currentHasZone) {
+              map.set(barcode, { sku: sku || existing.sku, zone });
+            }
+          }
+        }
+
+        if (map.size === 0) {
+          throw new Error(`Aucun code-barres valide trouvé dans "${firstSheetName}".`);
+        }
+
+        return {
+          map,
+          sheetName: firstSheetName,
+          rowsProcessed,
+          uniqueBarcodes: map.size,
+          labels: cols.labels
+        };
+      }
+
+      /**
+       * =========================================================================
+       * 2. AUDIO FEEDBACK ENGINE (Synthesized Web Audio API)
+       * =========================================================================
+       */
+      const AudioFeedback = (() => {
+        let ctx = null;
+        let isMuted = false;
+
+        function ensureContext() {
+          if (isMuted) return null;
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return null;
+          if (!ctx) ctx = new AudioCtx();
+          if (ctx.state === "suspended") ctx.resume().catch(() => {});
+          return ctx;
+        }
+
+        function playTone(freq, startOffset, duration, type, volume) {
+          const audioCtx = ensureContext();
+          if (!audioCtx) return;
+
+          const now = audioCtx.currentTime + startOffset;
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, now);
+
+          gain.gain.setValueAtTime(0.001, now);
+          gain.gain.exponentialRampToValueAtTime(volume, now + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          osc.start(now);
+          osc.stop(now + duration + 0.015);
+        }
+
+        return {
+          unlock() {
+            try { ensureContext(); } catch (_) {}
+          },
+          toggleMute() {
+            isMuted = !isMuted;
+            return isMuted;
+          },
+          playSuccess() {
+            try {
+              playTone(987.77, 0.0, 0.075, "sine", 0.25);
+              playTone(1318.51, 0.075, 0.11, "sine", 0.28);
+              if (navigator.vibrate) navigator.vibrate(70);
+            } catch (_) {}
+          },
+          playError() {
+            try {
+              playTone(155, 0.0, 0.12, "sawtooth", 0.22);
+              playTone(125, 0.15, 0.18, "sawtooth", 0.22);
+              if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+            } catch (_) {}
+          }
+        };
+      })();
+
+      /**
+       * =========================================================================
+       * 3. DEBOUNCE & DOM REFERENCES
+       * =========================================================================
+       */
+      function debounce(fn, delayMs) {
+        let timerId = null;
+        const debounced = function (...args) {
+          if (timerId !== null) clearTimeout(timerId);
+          timerId = setTimeout(() => {
+            timerId = null;
+            fn.apply(this, args);
+          }, delayMs);
+        };
+        debounced.cancel = () => {
+          if (timerId !== null) {
+            clearTimeout(timerId);
+            timerId = null;
+          }
+        };
+        return debounced;
+      }
+
+      const uploadSection = document.getElementById("upload-section");
+      const dropZone = document.getElementById("drop-zone");
+      const excelUploadInput = document.getElementById("excel-upload");
+      const uploadLoading = document.getElementById("upload-loading");
+      const uploadError = document.getElementById("upload-error");
+
+      const scannerSection = document.getElementById("scanner-section");
+      const loadedFileNameEl = document.getElementById("loaded-file-name");
+      const loadedFileStatsEl = document.getElementById("loaded-file-stats");
+      const changeFileBtn = document.getElementById("change-file-btn");
+
+      const modeBadge = document.getElementById("mode-badge");
+      const modeDot = document.getElementById("mode-dot");
+      const modeLabel = document.getElementById("mode-label");
+      const focusIndicator = document.getElementById("focus-indicator");
+
+      const soundToggleBtn = document.getElementById("sound-toggle-btn");
+      const iconSoundOn = document.getElementById("icon-sound-on");
+      const iconSoundOff = document.getElementById("icon-sound-off");
+
+      const barcodeInput = document.getElementById("barcode-input");
+      const clearInputBtn = document.getElementById("clear-input-btn");
+      const manualScanForm = document.getElementById("manual-scan-form");
+      const cameraToggleBtn = document.getElementById("camera-toggle-btn");
+      const cameraBtnLabel = document.getElementById("camera-btn-label");
+      const switchToUsbBtn = document.getElementById("switch-to-usb-btn");
+      const cameraSection = document.getElementById("camera-section");
+      const cameraErrorEl = document.getElementById("camera-error");
+      const readerEl = document.getElementById("reader");
+
+      const resultPanel = document.getElementById("result-panel");
+      const stateIdle = document.getElementById("state-idle");
+      const stateSuccess = document.getElementById("state-success");
+      const stateNoZone = document.getElementById("state-nozone");
+      const stateError = document.getElementById("state-error");
+
+      const resultZoneEl = document.getElementById("result-zone");
+      const resultSkuEl = document.getElementById("result-sku");
+      const resultBarcodeEl = document.getElementById("result-barcode");
+      const noZoneSkuEl = document.getElementById("nozone-sku");
+      const noZoneBarcodeEl = document.getElementById("nozone-barcode");
+      const errorBarcodeEl = document.getElementById("error-barcode");
+      const countdownTrack = document.getElementById("countdown-track");
+      const countdownBar = document.getElementById("countdown-bar");
+
+      const state = {
+        isLoaded: false,
+        isCameraActive: false,
+        isCameraBusy: false,
+        html5QrcodeScanner: null,
+        autoClearTimer: null,
+        lastScanCode: "",
+        lastScanAt: 0,
+        lastKeyTime: 0,
+        rapidBurstCount: 0
+      };
+
+      const AUTO_CLEAR_MS = 3000;
+      const USB_DEBOUNCE_MS = 160;
+      const USB_DUPLICATE_COOLDOWN_MS = 350;
+      const CAMERA_DUPLICATE_COOLDOWN_MS = 1800;
+
+      /**
+       * =========================================================================
+       * 4. UI STATE, AUTO-CLEAR (3s) & FOCUS HELPERS
+       * =========================================================================
+       */
+      function focusScannerInput() {
+        if (!state.isLoaded || state.isCameraActive) return;
+        requestAnimationFrame(() => {
+          if (state.isLoaded && !state.isCameraActive && document.activeElement !== barcodeInput) {
+            barcodeInput.focus({ preventScroll: true });
+          }
+        });
+      }
+
+      function updateClearBtnVisibility() {
+        clearInputBtn.classList.toggle("hidden", barcodeInput.value.length === 0);
+      }
+
+      function updateModeUI() {
+        modeBadge.classList.toggle("hidden", !state.isLoaded);
+        if (!state.isLoaded) return;
+
+        if (state.isCameraActive) {
+          modeBadge.className = "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border border-blue-500/40 bg-blue-500/15 text-blue-300";
+          modeDot.className = "w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse";
+          modeLabel.textContent = "Caméra Active";
+          focusIndicator.textContent = "Cliquer pour Douchette";
+          focusIndicator.className = "text-xs font-bold text-amber-600";
+
+          cameraToggleBtn.className = "w-full min-h-[56px] py-3.5 px-5 rounded-2xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white font-black text-lg tracking-wide shadow-lg border-2 border-slate-600 flex items-center justify-center gap-3 transition touch-manipulation";
+          cameraBtnLabel.textContent = "Fermer la Caméra";
+        } else {
+          modeBadge.className = "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border border-green-500/40 bg-green-500/15 text-green-400";
+          modeDot.className = "w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse";
+          modeLabel.textContent = "Douchette USB";
+          focusIndicator.textContent = "Focus auto actif";
+          focusIndicator.className = "text-xs font-bold text-green-600";
+
+          cameraToggleBtn.className = "w-full min-h-[56px] py-3.5 px-5 rounded-2xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-black text-lg tracking-wide shadow-lg border-2 border-blue-400/30 flex items-center justify-center gap-3 transition touch-manipulation";
+          cameraBtnLabel.textContent = "Ouvrir la Caméra";
+        }
+      }
+
+      function clearAutoResetTimer() {
+        if (state.autoClearTimer !== null) {
+          clearTimeout(state.autoClearTimer);
+          state.autoClearTimer = null;
+        }
+      }
+
+      function resetToIdleState() {
+        clearAutoResetTimer();
+        stateSuccess.classList.add("hidden");
+        stateNoZone.classList.add("hidden");
+        stateError.classList.add("hidden");
+        countdownTrack.classList.add("hidden");
+        countdownBar.classList.remove("animate-countdown");
+
+        resultPanel.className = "relative overflow-hidden rounded-3xl border-4 border-slate-200 bg-white p-6 sm:p-8 text-center shadow-2xl transition-all";
+        stateIdle.classList.remove("hidden");
+      }
+
+      function scheduleAutoClear() {
+        clearAutoResetTimer();
+        countdownTrack.classList.remove("hidden");
+        countdownBar.classList.remove("animate-countdown");
+        void countdownBar.offsetWidth;
+        countdownBar.classList.add("animate-countdown");
+
+        state.autoClearTimer = setTimeout(() => {
+          state.autoClearTimer = null;
+          resetToIdleState();
+          if (!state.isCameraActive) {
+            focusScannerInput();
+          }
+        }, AUTO_CLEAR_MS);
+      }
+
+      function triggerFlashAnimation() {
+        resultPanel.classList.remove("animate-scan-flash");
+        void resultPanel.offsetWidth;
+        resultPanel.classList.add("animate-scan-flash");
+      }
+
+      /**
+       * =========================================================================
+       * 5. LOOKUP ENGINE
+       * =========================================================================
+       */
+      function lookupBarcode(rawBarcode) {
+        const code = String(rawBarcode ?? "").trim();
+        if (!code) return null;
+
+        let entry = inventoryMap.get(code);
+
+        // Fallback for UPC-A (12 digits) vs EAN-13 padded with leading zero
+        if (!entry && code.length === 13 && code.startsWith("0")) {
+          entry = inventoryMap.get(code.slice(1));
+        } else if (!entry && code.length === 12) {
+          entry = inventoryMap.get("0" + code);
+        }
+
+        return { code, entry: entry || null };
+      }
+
+      function handleBarcodeScan(rawBarcode, source = "usb") {
+        if (!state.isLoaded) return;
+
+        const code = String(rawBarcode ?? "").trim();
+        if (!code) return;
+
+        const now = Date.now();
+        const cooldown = source === "camera" ? CAMERA_DUPLICATE_COOLDOWN_MS : USB_DUPLICATE_COOLDOWN_MS;
+
+        if (code === state.lastScanCode && now - state.lastScanAt < cooldown) {
+          if (source === "usb") {
+            barcodeInput.value = "";
+            updateClearBtnVisibility();
+            focusScannerInput();
+          }
+          return;
+        }
+
+        state.lastScanCode = code;
+        state.lastScanAt = now;
+        state.rapidBurstCount = 0;
+        state.lastKeyTime = 0;
+
+        if (source === "usb") {
+          barcodeInput.value = "";
+          updateClearBtnVisibility();
+        }
+
+        // Instantly clear previous result & reset 3-second countdown
+        clearAutoResetTimer();
+        stateIdle.classList.add("hidden");
+        stateSuccess.classList.add("hidden");
+        stateNoZone.classList.add("hidden");
+        stateError.classList.add("hidden");
+
+        const result = lookupBarcode(code);
+
+        if (!result || !result.entry) {
+          resultPanel.className = "relative overflow-hidden rounded-3xl border-4 border-red-600 bg-red-50 p-6 sm:p-8 text-center shadow-2xl transition-all";
+          errorBarcodeEl.textContent = `Code-barres : ${code}`;
+          stateError.classList.remove("hidden");
+          countdownBar.className = "h-full bg-red-600";
+          AudioFeedback.playError();
+        } else {
+          const { sku, zone } = result.entry;
+          const cleanZone = String(zone ?? "").trim();
+          const hasValidZone = cleanZone.length > 0 && cleanZone.toUpperCase() !== "NO ZONE";
+
+          if (!hasValidZone) {
+            // Barcode & SKU exist, but Zone cell is empty or marked NO ZONE
+            resultPanel.className = "relative overflow-hidden rounded-3xl border-4 border-red-600 bg-red-50 p-6 sm:p-8 text-center shadow-2xl transition-all";
+            noZoneSkuEl.textContent = sku || "SKU non renseigné";
+            noZoneBarcodeEl.textContent = `Code-barres : ${code}`;
+            stateNoZone.classList.remove("hidden");
+            countdownBar.className = "h-full bg-red-600";
+            AudioFeedback.playError();
+          } else {
+            // Found with valid Zone
+            resultPanel.className = "relative overflow-hidden rounded-3xl border-4 border-green-600 bg-white p-6 sm:p-8 text-center shadow-2xl transition-all";
+            resultZoneEl.textContent = cleanZone;
+            resultSkuEl.textContent = sku || "SKU non renseigné";
+            resultBarcodeEl.textContent = `Code-barres : ${code}`;
+            stateSuccess.classList.remove("hidden");
+            countdownBar.className = "h-full bg-green-600";
+            AudioFeedback.playSuccess();
+          }
+        }
+
+        triggerFlashAnimation();
+        scheduleAutoClear();
+
+        if (!state.isCameraActive) {
+          focusScannerInput();
+        }
+      }
+
+      /**
+       * =========================================================================
+       * 6. EXCEL UPLOAD HANDLERS
+       * =========================================================================
+       */
+      function processUploadedFile(file) {
+        if (!file) return;
+
+        uploadError.classList.add("hidden");
+        uploadError.textContent = "";
+        uploadLoading.classList.remove("hidden");
+
+        // Yield one frame so the spinner renders before synchronous XLSX.read on large files
+        setTimeout(async () => {
+          try {
+            const buffer = await file.arrayBuffer();
+            const parsed = parseExcelWorkbook(buffer);
+
+            inventoryMap = parsed.map;
+            state.isLoaded = true;
+            state.lastScanCode = "";
+            state.lastScanAt = 0;
+
+            loadedFileNameEl.textContent = `${file.name} (${parsed.sheetName})`;
+            loadedFileStatsEl.textContent = `${parsed.uniqueBarcodes.toLocaleString("fr-FR")} codes-barres • Colonnes : ${parsed.labels.barcode} / ${parsed.labels.sku} / ${parsed.labels.zone}`;
+
+            uploadSection.classList.add("hidden");
+            scannerSection.classList.remove("hidden");
+            resetToIdleState();
+            updateModeUI();
+            focusScannerInput();
+          } catch (err) {
+            console.error("Erreur lecture Excel:", err);
+            uploadError.textContent = err?.message || "Impossible de lire ce fichier Excel.";
+            uploadError.classList.remove("hidden");
+          } finally {
+            uploadLoading.classList.add("hidden");
+          }
+        }, 30);
+      }
+
+      excelUploadInput.addEventListener("change", (e) => {
+        AudioFeedback.unlock();
+        const file = e.target.files?.[0];
+        if (file) processUploadedFile(file);
+      });
+
+      dropZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropZone.classList.add("border-green-600", "bg-green-50");
+      });
+
+      dropZone.addEventListener("dragleave", () => {
+        dropZone.classList.remove("border-green-600", "bg-green-50");
+      });
+
+      dropZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("border-green-600", "bg-green-50");
+        const file = e.dataTransfer?.files?.[0];
+        if (file) processUploadedFile(file);
+      });
+
+      changeFileBtn.addEventListener("click", async () => {
+        clearAutoResetTimer();
+        if (state.isCameraActive) {
+          await stopCamera();
+        }
+        state.isLoaded = false;
+        inventoryMap = new Map();
+        excelUploadInput.value = "";
+        barcodeInput.value = "";
+        updateClearBtnVisibility();
+        updateModeUI();
+
+        scannerSection.classList.add("hidden");
+        uploadSection.classList.remove("hidden");
+      });
+
+      /**
+       * =========================================================================
+       * 7. HYBRID INPUT LISTENERS (USB DOUCHETTE + MANUAL + CAMERA)
+       * =========================================================================
+       */
+      const debouncedUsbScannerSubmit = debounce((val) => {
+        const trimmed = String(val ?? "").trim();
+        if (trimmed.length >= 4) {
+          handleBarcodeScan(trimmed, "usb");
+        }
+      }, USB_DEBOUNCE_MS);
+
+      barcodeInput.addEventListener("keydown", (e) => {
+        AudioFeedback.unlock();
+
+        const now = performance.now();
+        const delta = now - state.lastKeyTime;
+        state.lastKeyTime = now;
+
+        if (delta > 0 && delta < 55) {
+          state.rapidBurstCount += 1;
+        } else if (delta >= 120) {
+          state.rapidBurstCount = 0;
+        }
+
+        if (e.key === "Enter") {
+          e.preventDefault();
+          debouncedUsbScannerSubmit.cancel();
+          handleBarcodeScan(barcodeInput.value, "usb");
+        }
+      });
+
+      barcodeInput.addEventListener("input", () => {
+        updateClearBtnVisibility();
+        const val = barcodeInput.value.trim();
+        if (!val) {
+          debouncedUsbScannerSubmit.cancel();
+          return;
+        }
+
+        if (state.rapidBurstCount >= 3 || state.lastKeyTime === 0) {
+          debouncedUsbScannerSubmit(val);
+        }
+      });
+
+      barcodeInput.addEventListener("paste", () => {
+        requestAnimationFrame(() => {
+          updateClearBtnVisibility();
+          if (barcodeInput.value.trim().length >= 4) {
+            debouncedUsbScannerSubmit(barcodeInput.value);
+          }
+        });
+      });
+
+      manualScanForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        AudioFeedback.unlock();
+        debouncedUsbScannerSubmit.cancel();
+
+        if (state.isCameraActive) {
+          await stopCamera();
+        }
+        handleBarcodeScan(barcodeInput.value, "usb");
+      });
+
+      clearInputBtn.addEventListener("click", () => {
+        debouncedUsbScannerSubmit.cancel();
+        barcodeInput.value = "";
+        updateClearBtnVisibility();
+        focusScannerInput();
+      });
+
+      barcodeInput.addEventListener("focus", () => {
+        if (state.isCameraActive) stopCamera();
+      });
+
+      barcodeInput.addEventListener("pointerdown", () => {
+        AudioFeedback.unlock();
+        if (state.isCameraActive) stopCamera();
+      });
+
+      /**
+       * =========================================================================
+       * 8. CAMERA SCANNER (html5-qrcode)
+       * =========================================================================
+       */
+      function stopDanglingVideoTracks() {
+        readerEl.querySelectorAll("video").forEach((video) => {
+          const stream = video.srcObject;
+          if (stream && typeof stream.getTracks === "function") {
+            stream.getTracks().forEach((track) => track.stop());
+          }
+          video.srcObject = null;
+        });
+      }
+
+      async function startCamera() {
+        if (state.isCameraActive || state.isCameraBusy) return;
+        state.isCameraBusy = true;
+        cameraErrorEl.classList.add("hidden");
+        cameraErrorEl.textContent = "";
+
+        if (typeof Html5QrcodeScanner === "undefined") {
+          cameraSection.classList.remove("hidden");
+          cameraErrorEl.textContent = "Librairie caméra indisponible (vérifiez la connexion réseau pour html5-qrcode).";
+          cameraErrorEl.classList.remove("hidden");
+          state.isCameraBusy = false;
+          return;
+        }
+
+        try {
+          debouncedUsbScannerSubmit.cancel();
+          barcodeInput.blur();
+          state.isCameraActive = true;
+          cameraSection.classList.remove("hidden");
+          updateModeUI();
+
+          const formatsToSupport = typeof Html5QrcodeSupportedFormats !== "undefined"
+            ? [
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.UPC_A,
+                Html5QrcodeSupportedFormats.UPC_E,
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.CODE_39,
+                Html5QrcodeSupportedFormats.ITF,
+                Html5QrcodeSupportedFormats.QR_CODE,
+                Html5QrcodeSupportedFormats.DATA_MATRIX
+              ]
+            : undefined;
+
+          const config = {
+            fps: 12,
+            rememberLastUsedCamera: true,
+            qrbox: (viewfinderWidth, viewfinderHeight) => ({
+              width: Math.max(50, Math.min(320, Math.floor(viewfinderWidth * 0.85))),
+              height: Math.max(50, Math.min(160, Math.floor(viewfinderHeight * 0.55)))
+            }),
+            ...(formatsToSupport ? { formatsToSupport } : {})
+          };
+
+          state.html5QrcodeScanner = new Html5QrcodeScanner("reader", config, /* verbose= */ false);
+          state.html5QrcodeScanner.render(
+            (decodedText) => handleBarcodeScan(decodedText, "camera"),
+            () => {}
+          );
+
+          cameraSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        } catch (err) {
+          console.error("Erreur démarrage caméra:", err);
+          cameraErrorEl.textContent = "Impossible d'accéder à la caméra (permissions navigateur ou HTTPS requis).";
+          cameraErrorEl.classList.remove("hidden");
+          await stopCamera();
+        } finally {
+          state.isCameraBusy = false;
+        }
+      }
+
+      async function stopCamera() {
+        if (state.isCameraBusy && !state.isCameraActive) return;
+        state.isCameraBusy = true;
+        state.isCameraActive = false;
+
+        try {
+          if (state.html5QrcodeScanner) {
+            await state.html5QrcodeScanner.clear().catch(() => {});
+            state.html5QrcodeScanner = null;
+          }
+          stopDanglingVideoTracks();
+        } finally {
+          readerEl.innerHTML = "";
+          cameraSection.classList.add("hidden");
+          state.isCameraBusy = false;
+          updateModeUI();
+          focusScannerInput();
+        }
+      }
+
+      cameraToggleBtn.addEventListener("click", () => {
+        AudioFeedback.unlock();
+        if (state.isCameraActive) {
+          stopCamera();
+        } else {
+          startCamera();
+        }
+      });
+
+      switchToUsbBtn.addEventListener("click", () => {
+        AudioFeedback.unlock();
+        stopCamera();
+      });
+
+      soundToggleBtn.addEventListener("click", () => {
+        const muted = AudioFeedback.toggleMute();
+        iconSoundOn.classList.toggle("hidden", muted);
+        iconSoundOff.classList.toggle("hidden", !muted);
+        soundToggleBtn.title = muted ? "Son coupé" : "Son activé";
+        if (!muted) AudioFeedback.unlock();
+        focusScannerInput();
+      });
+
+      document.addEventListener("click", (e) => {
+        AudioFeedback.unlock();
+        if (!state.isLoaded || state.isCameraActive) return;
+        const interactive = e.target.closest("button, input, select, textarea, a, label");
+        if (!interactive) focusScannerInput();
+      });
+
+      window.addEventListener("focus", () => {
+        if (state.isLoaded && !state.isCameraActive) {
+          focusScannerInput();
+        }
+      });
+
+      window.addEventListener("pagehide", () => {
+        if (state.isCameraActive) stopCamera();
+      });
+    })();
+  </script>
+</body>
+</html>

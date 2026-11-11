@@ -1,0 +1,9 @@
+# Protect sensitive warehouse Excel spreadsheets
+*.xlsx
+*.xls
+~$*.xlsx
+~$*.xls
+
+# OS junk files
+.DS_Store
+Thumbs.db
