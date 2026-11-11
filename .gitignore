@@ -1,6 +1,8 @@
-# Protect sensitive warehouse Excel spreadsheets
+# Protect stray spreadsheets while allowing the GitHub Pages zoning data file
 *.xlsx
 *.xls
+!Zonning Smail Platforme.xlsx
+!zoning.xlsx
 ~$*.xlsx
 ~$*.xls
 

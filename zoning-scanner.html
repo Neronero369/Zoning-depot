@@ -107,10 +107,10 @@
       <div class="flex items-center gap-2 shrink-0">
         <span
           id="header-status-badge"
-          class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-semibold border bg-yellow-50 text-yellow-700 border-yellow-200"
+          class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-semibold border bg-blue-50 text-blue-700 border-blue-200"
         >
-          <span id="header-status-dot" class="w-2 h-2 rounded-full bg-yellow-500"></span>
-          <span id="header-status-label">En attente...</span>
+          <span id="header-status-dot" class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+          <span id="header-status-label">Chargement...</span>
         </span>
 
         <button
@@ -135,298 +135,245 @@
 
   <main class="flex-1 w-full max-w-xl mx-auto px-4 py-5 flex flex-col gap-4">
 
-    <!-- ===================================================================== -->
-    <!-- SECTION 1: EXCEL FILE INGESTION (Delivery Card Style)                 -->
-    <!-- ===================================================================== -->
+    <!-- Main Scanner Delivery Card -->
     <section
-      id="upload-section"
-      aria-label="Importation du fichier Excel"
+      aria-label="Scanner Zoning"
       class="bg-white border border-gray-200 rounded-2xl shadow-sm p-5 flex flex-col gap-4"
     >
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <h2 class="text-lg font-bold text-slate-800 tracking-tight">Charger le fichier Zoning</h2>
-          <p class="text-sm text-slate-500 mt-0.5">
-            Importez le fichier Excel (<span class="font-mono">.xlsx</span>, <span class="font-mono">.xls</span>) pour activer le scanner.
-          </p>
-        </div>
-        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border bg-yellow-50 text-yellow-700 border-yellow-200 shrink-0">
-          En attente
+      <!-- Database Auto-Load Status Badge Bar -->
+      <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-gray-100">
+        <span
+          id="db-status"
+          class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border bg-blue-50 text-blue-700 border-blue-200"
+        >
+          <svg class="animate-spin h-4 w-4 text-blue-600 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Initialisation de la base de données...</span>
         </span>
+
+        <button
+          id="retry-fetch-btn"
+          type="button"
+          class="hidden px-3 py-1 rounded-xl bg-gray-50 hover:bg-gray-100 text-xs font-semibold text-slate-700 border border-gray-200 transition-colors touch-manipulation"
+        >
+          Réessayer
+        </button>
       </div>
 
-      <label
-        id="drop-zone"
-        for="excel-upload"
-        class="cursor-pointer rounded-xl border-2 border-dashed border-gray-200 hover:border-blue-400 bg-gray-50 p-5 text-center transition-colors flex flex-col items-center gap-3"
-      >
-        <div class="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-blue-600">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-          </svg>
+      <!-- Fetch Error Notice (Shown only on fetch/parse error) -->
+      <div
+        id="db-error-notice"
+        class="hidden rounded-xl bg-red-50 border border-red-200 p-3 text-xs sm:text-sm font-medium text-red-700"
+      ></div>
+
+      <!-- Hybrid Input Bar (Auto-focused for USB Douchette + Manual Entry) -->
+      <div>
+        <div class="flex items-center justify-between mb-1.5">
+          <label for="barcode-input" class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Douchette USB / Code-barres ou SKU
+          </label>
+          <span id="focus-indicator" class="text-xs font-semibold text-slate-400">
+            Chargement...
+          </span>
         </div>
-        <div class="text-sm text-slate-500">
-          Glissez-déposez votre fichier ici ou sélectionnez-le ci-dessous
-        </div>
-        <span class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <span>Importer le fichier Excel</span>
-        </span>
-        <input
-          type="file"
-          id="excel-upload"
-          accept=".xlsx, .xls"
-          class="sr-only"
-        />
-      </label>
 
-      <div id="upload-loading" class="hidden flex items-center justify-center gap-2.5 py-2 text-slate-700 font-semibold text-sm">
-        <div class="w-4 h-4 rounded-full border-2 border-gray-300 border-t-blue-600 animate-spin"></div>
-        <span>Indexation des codes-barres en cours...</span>
-      </div>
-
-      <div id="upload-error" class="hidden rounded-xl bg-red-50 border border-red-200 p-3 text-sm font-semibold text-red-700 text-center"></div>
-    </section>
-
-    <!-- ===================================================================== -->
-    <!-- SECTION 2: MAIN SCANNER DELIVERY CARD                                 -->
-    <!-- ===================================================================== -->
-    <div id="scanner-section" class="hidden flex flex-col gap-4">
-
-      <section
-        aria-label="Scanner Zoning"
-        class="bg-white border border-gray-200 rounded-2xl shadow-sm p-5 flex flex-col gap-4"
-      >
-        <!-- Card Top Bar: File Info & Status Pill Badge -->
-        <div class="flex items-start justify-between gap-3 pb-3 border-b border-gray-100">
-          <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-2 mb-1">
-              <span
-                id="scanner-status-badge"
-                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200"
-              >
-                <span id="scanner-status-dot" class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span id="scanner-status-label">Prêt à scanner</span>
-              </span>
-            </div>
-            <p id="loaded-file-name" class="text-sm font-semibold text-slate-800 truncate"></p>
-            <p id="loaded-file-stats" class="text-xs text-slate-500 truncate"></p>
+        <form id="manual-scan-form" class="flex items-stretch gap-2" autocomplete="off">
+          <div class="relative flex-1">
+            <input
+              id="barcode-input"
+              name="barcode"
+              type="text"
+              inputmode="text"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              spellcheck="false"
+              disabled
+              placeholder="Scanner code-barres ou saisir SKU..."
+              class="w-full h-12 pl-3.5 pr-9 rounded-xl bg-gray-50 border border-gray-200 focus:border-blue-600 focus:bg-white focus:outline-none text-slate-800 placeholder-slate-400 font-mono text-sm sm:text-base font-semibold tracking-wide transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            />
+            <button
+              id="clear-input-btn"
+              type="button"
+              aria-label="Effacer le champ"
+              class="hidden absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-gray-200 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
 
           <button
-            id="change-file-btn"
-            type="button"
-            class="shrink-0 px-3 py-1.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-xs font-semibold text-slate-700 border border-gray-200 transition-colors touch-manipulation"
+            id="submit-scan-btn"
+            type="submit"
+            disabled
+            class="h-12 px-4 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-sm tracking-wide transition-colors touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
           >
-            Changer Excel
+            OK
           </button>
+        </form>
+      </div>
+
+      <!-- Camera Toggle Action Button (LIVRER style) -->
+      <button
+        id="camera-toggle-btn"
+        type="button"
+        disabled
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2.5 transition-colors touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h2l1.5-2h7L17 7h2a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+          <circle cx="12" cy="13" r="3.5" />
+        </svg>
+        <span id="camera-btn-label">Ouvrir la Caméra</span>
+      </button>
+
+      <!-- Result Container (Delivery Destination Format) -->
+      <div
+        id="result-panel"
+        aria-live="polite"
+        class="relative overflow-hidden bg-gray-50 border border-gray-200 rounded-xl p-4 transition-all"
+      >
+        <!-- Idle State -->
+        <div id="state-idle" class="py-5 flex flex-col items-center justify-center text-center gap-2">
+          <div class="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-slate-400">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 7V5a1 1 0 011-1h2M17 4h2a1 1 0 011 1v2M4 17v2a1 1 0 001 1h2M17 20h2a1 1 0 001-1v-2M7 8v8M10 8v8M13 8v8M17 8v8" />
+            </svg>
+          </div>
+          <p id="idle-title" class="text-base font-bold text-slate-800 tracking-tight">Chargement du zoning...</p>
+          <p id="idle-subtitle" class="text-xs text-slate-500 max-w-xs">
+            Téléchargement automatique du fichier Excel en cours.
+          </p>
         </div>
 
-        <!-- Hybrid Input Bar (Auto-focused for USB Douchette + Manual Entry) -->
-        <div>
-          <div class="flex items-center justify-between mb-1.5">
-            <label for="barcode-input" class="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Douchette USB / Saisie manuelle
-            </label>
-            <span id="focus-indicator" class="text-xs font-semibold text-emerald-600">
-              Focus auto actif
+        <!-- Found with Valid Zone (Client Name = SKU + License Plate = Zone) -->
+        <div id="state-success" class="hidden flex flex-col gap-3">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Article / SKU
+              </span>
+              <p id="result-sku" class="text-xl font-bold text-slate-800 tracking-tight break-all"></p>
+            </div>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0">
+              Zone trouvée
             </span>
           </div>
 
-          <form id="manual-scan-form" class="flex items-stretch gap-2" autocomplete="off">
-            <div class="relative flex-1">
-              <input
-                id="barcode-input"
-                name="barcode"
-                type="text"
-                inputmode="text"
-                autocomplete="off"
-                autocorrect="off"
-                autocapitalize="off"
-                spellcheck="false"
-                placeholder="Scanner un code-barres ou saisir..."
-                class="w-full h-12 pl-3.5 pr-9 rounded-xl bg-gray-50 border border-gray-200 focus:border-blue-600 focus:bg-white focus:outline-none text-slate-800 placeholder-slate-400 font-mono text-sm sm:text-base font-semibold tracking-wide transition-colors"
-              />
-              <button
-                id="clear-input-btn"
-                type="button"
-                aria-label="Effacer le champ"
-                class="hidden absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-gray-200 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+          <!-- Massive Destination Tag / License Plate Block -->
+          <div class="bg-white border-2 border-green-500 rounded-xl p-4 text-center">
+            <span class="block text-[11px] font-bold uppercase tracking-widest text-green-700 mb-1">
+              Destination Zoning
+            </span>
+            <p
+              id="result-zone"
+              class="text-6xl font-black text-green-600 tracking-tight break-words leading-none"
+            ></p>
+          </div>
 
-            <button
-              type="submit"
-              class="h-12 px-4 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-sm tracking-wide transition-colors touch-manipulation"
-            >
-              OK
-            </button>
-          </form>
+          <div class="flex items-center justify-between text-xs text-slate-500 pt-0.5">
+            <span>Référence / Code-barres</span>
+            <span id="result-barcode" class="font-mono font-semibold text-slate-700"></span>
+          </div>
         </div>
 
-        <!-- Camera Toggle Action Button (LIVRER style) -->
-        <button
-          id="camera-toggle-btn"
-          type="button"
-          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2.5 transition-colors touch-manipulation"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h2l1.5-2h7L17 7h2a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-            <circle cx="12" cy="13" r="3.5" />
-          </svg>
-          <span id="camera-btn-label">Ouvrir la Caméra</span>
-        </button>
-
-        <!-- Result Container (Delivery Destination Format) -->
-        <div
-          id="result-panel"
-          aria-live="polite"
-          class="relative overflow-hidden bg-gray-50 border border-gray-200 rounded-xl p-4 transition-all"
-        >
-          <!-- Idle State -->
-          <div id="state-idle" class="py-5 flex flex-col items-center justify-center text-center gap-2">
-            <div class="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-slate-400">
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 7V5a1 1 0 011-1h2M17 4h2a1 1 0 011 1v2M4 17v2a1 1 0 001 1h2M17 20h2a1 1 0 001-1v-2M7 8v8M10 8v8M13 8v8M17 8v8" />
-              </svg>
+        <!-- Found SKU but Empty Zone / NO ZONE -->
+        <div id="state-nozone" class="hidden flex flex-col gap-3">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Article / SKU
+              </span>
+              <p id="nozone-sku" class="text-xl font-bold text-slate-800 tracking-tight break-all"></p>
             </div>
-            <p class="text-base font-bold text-slate-800 tracking-tight">En attente de scan</p>
-            <p class="text-xs text-slate-500 max-w-xs">
-              Bippez une boîte avec la douchette USB ou utilisez la caméra mobile.
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-red-50 text-red-700 border-red-200 shrink-0">
+              Sans zone
+            </span>
+          </div>
+
+          <div class="bg-red-50 border-2 border-red-400 rounded-xl p-4 text-center">
+            <span class="block text-[11px] font-bold uppercase tracking-widest text-red-700 mb-1">
+              Emplacement Non Attribué
+            </span>
+            <p class="text-6xl font-black text-red-600 tracking-tight leading-none">
+              NO ZONE
             </p>
           </div>
 
-          <!-- Found with Valid Zone (Client Name = SKU + License Plate = Zone) -->
-          <div id="state-success" class="hidden flex flex-col gap-3">
-            <div class="flex items-start justify-between gap-2">
-              <div class="min-w-0">
-                <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Article / SKU
-                </span>
-                <p id="result-sku" class="text-xl font-bold text-slate-800 tracking-tight break-all"></p>
-              </div>
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0">
-                Zone trouvée
-              </span>
-            </div>
-
-            <!-- Massive Destination Tag / License Plate Block -->
-            <div class="bg-white border-2 border-green-500 rounded-xl p-4 text-center">
-              <span class="block text-[11px] font-bold uppercase tracking-widest text-green-700 mb-1">
-                Destination Zoning
-              </span>
-              <p
-                id="result-zone"
-                class="text-6xl font-black text-green-600 tracking-tight break-words leading-none"
-              ></p>
-            </div>
-
-            <div class="flex items-center justify-between text-xs text-slate-500 pt-0.5">
-              <span>Code-barres scanné</span>
-              <span id="result-barcode" class="font-mono font-semibold text-slate-700"></span>
-            </div>
-          </div>
-
-          <!-- Found SKU but Empty Zone / NO ZONE -->
-          <div id="state-nozone" class="hidden flex flex-col gap-3">
-            <div class="flex items-start justify-between gap-2">
-              <div class="min-w-0">
-                <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Article / SKU
-                </span>
-                <p id="nozone-sku" class="text-xl font-bold text-slate-800 tracking-tight break-all"></p>
-              </div>
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-red-50 text-red-700 border-red-200 shrink-0">
-                Sans zone
-              </span>
-            </div>
-
-            <div class="bg-red-50 border-2 border-red-400 rounded-xl p-4 text-center">
-              <span class="block text-[11px] font-bold uppercase tracking-widest text-red-700 mb-1">
-                Emplacement Non Attribué
-              </span>
-              <p class="text-6xl font-black text-red-600 tracking-tight leading-none">
-                NO ZONE
-              </p>
-            </div>
-
-            <div class="flex items-center justify-between text-xs text-slate-500 pt-0.5">
-              <span>Code-barres scanné</span>
-              <span id="nozone-barcode" class="font-mono font-semibold text-slate-700"></span>
-            </div>
-          </div>
-
-          <!-- Not Found -->
-          <div id="state-error" class="hidden flex flex-col gap-3">
-            <div class="flex items-start justify-between gap-2">
-              <div class="min-w-0">
-                <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Statut Article
-                </span>
-                <p class="text-xl font-bold text-slate-800 tracking-tight">Code-barres introuvable</p>
-              </div>
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-red-50 text-red-700 border-red-200 shrink-0">
-                Non répertorié
-              </span>
-            </div>
-
-            <div class="bg-red-50 border-2 border-red-400 rounded-xl p-4 text-center">
-              <span class="block text-[11px] font-bold uppercase tracking-widest text-red-700 mb-1">
-                Destination
-              </span>
-              <p class="text-6xl font-black text-red-600 tracking-tight leading-none">
-                INCONNU
-              </p>
-            </div>
-
-            <div class="flex items-center justify-between text-xs text-slate-500 pt-0.5">
-              <span>Code-barres scanné</span>
-              <span id="error-barcode" class="font-mono font-semibold text-red-700"></span>
-            </div>
-          </div>
-
-          <!-- 3-Second Auto-Clear Progress Indicator -->
-          <div id="countdown-track" class="hidden absolute bottom-0 left-0 right-0 h-1 bg-gray-200">
-            <div id="countdown-bar" class="h-full bg-blue-600"></div>
+          <div class="flex items-center justify-between text-xs text-slate-500 pt-0.5">
+            <span>Référence / Code-barres</span>
+            <span id="nozone-barcode" class="font-mono font-semibold text-slate-700"></span>
           </div>
         </div>
-      </section>
 
-      <!-- Camera Scanner Card -->
-      <section
-        id="camera-section"
-        aria-label="Scanner Caméra"
-        class="hidden bg-white border border-gray-200 rounded-2xl shadow-sm p-5 flex flex-col gap-3"
-      >
-        <div class="flex items-center justify-between gap-2">
-          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border bg-blue-50 text-blue-700 border-blue-200">
-            <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
-            <span>Caméra Active</span>
-          </span>
-          <button
-            id="switch-to-usb-btn"
-            type="button"
-            class="px-3 py-1.5 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 text-xs font-semibold text-slate-700 transition-colors touch-manipulation"
-          >
-            Mode Douchette USB
-          </button>
+        <!-- Not Found -->
+        <div id="state-error" class="hidden flex flex-col gap-3">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Statut Article
+              </span>
+              <p class="text-xl font-bold text-slate-800 tracking-tight">Article introuvable</p>
+            </div>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-red-50 text-red-700 border-red-200 shrink-0">
+              Non répertorié
+            </span>
+          </div>
+
+          <div class="bg-red-50 border-2 border-red-400 rounded-xl p-4 text-center">
+            <span class="block text-[11px] font-bold uppercase tracking-widest text-red-700 mb-1">
+              Destination
+            </span>
+            <p class="text-6xl font-black text-red-600 tracking-tight leading-none">
+              INCONNU
+            </p>
+          </div>
+
+          <div class="flex items-center justify-between text-xs text-slate-500 pt-0.5">
+            <span>Requête / Code-barres</span>
+            <span id="error-barcode" class="font-mono font-semibold text-red-700"></span>
+          </div>
         </div>
 
-        <div id="reader" class="w-full"></div>
-        <p id="camera-error" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 text-sm font-semibold text-red-700"></p>
-      </section>
+        <!-- 3-Second Auto-Clear Progress Indicator -->
+        <div id="countdown-track" class="hidden absolute bottom-0 left-0 right-0 h-1 bg-gray-200">
+          <div id="countdown-bar" class="h-full bg-blue-600"></div>
+        </div>
+      </div>
+    </section>
 
-    </div>
+    <!-- Camera Scanner Card -->
+    <section
+      id="camera-section"
+      aria-label="Scanner Caméra"
+      class="hidden bg-white border border-gray-200 rounded-2xl shadow-sm p-5 flex flex-col gap-3"
+    >
+      <div class="flex items-center justify-between gap-2">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border bg-blue-50 text-blue-700 border-blue-200">
+          <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+          <span>Caméra Active</span>
+        </span>
+        <button
+          id="switch-to-usb-btn"
+          type="button"
+          class="px-3 py-1.5 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 text-xs font-semibold text-slate-700 transition-colors touch-manipulation"
+        >
+          Mode Douchette USB
+        </button>
+      </div>
+
+      <div id="reader" class="w-full"></div>
+      <p id="camera-error" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 text-sm font-semibold text-red-700"></p>
+    </section>
+
   </main>
 
   <footer class="w-full max-w-xl mx-auto px-4 py-3 text-center text-xs text-slate-500">
-    SARL TRADIFOOT WMS • Fonctionnement local hors-ligne
+    SARL TRADIFOOT WMS • Synchronisation GitHub automatique
   </footer>
 
   <script>
@@ -438,7 +385,12 @@
        * 1. IN-MEMORY INVENTORY DICTIONARY & EXCEL PARSER (SheetJS)
        * =========================================================================
        */
-      let inventoryMap = new Map();
+      const EXCEL_CANDIDATE_PATHS = [
+        "./zoning.xlsx",
+        "./Zonning%20Smail%20Platforme.xlsx"
+      ];
+      let barcodeMap = new Map();
+      let skuMap = new Map();
 
       /**
        * Extract a worksheet cell strictly as a clean trimmed String.
@@ -489,7 +441,12 @@
        * Detects Barcode, SKU, and Zone column indices from row 1 headers,
        * with heuristic fallback for non-standard sheets.
        */
-      function detectColumns(sheet, range) {
+      function isValidZoneValue(zone) {
+        const clean = String(zone ?? "").trim();
+        return clean.length > 0 && clean.toUpperCase() !== "NO ZONE";
+      }
+
+      function detectColumns(sheet, range, { requireBarcode = true } = {}) {
         const headerRow = range.s.r;
         const headers = [];
 
@@ -537,8 +494,8 @@
           }
         }
 
-        // Heuristic fallback if headers are missing or non-standard
-        if (barcodeCol === -1 && headers.length >= 2) {
+        // Heuristic fallback only for sheets expected to contain numeric barcodes
+        if (requireBarcode && barcodeCol === -1 && headers.length >= 2) {
           let bestCol = range.s.c;
           let bestScore = -1;
           const sampleEnd = Math.min(range.e.r, headerRow + 15);
@@ -553,7 +510,9 @@
               bestCol = c;
             }
           }
-          barcodeCol = bestCol;
+          if (bestScore > 0) {
+            barcodeCol = bestCol;
+          }
         }
 
         const remainingCols = headers
@@ -567,85 +526,93 @@
           zoneCol = remainingCols.shift();
         }
 
-        const getLabel = (colIdx) =>
-          headers.find((h) => h.colIndex === colIdx)?.raw || `Col ${colIdx + 1}`;
-
-        return {
-          barcodeCol,
-          skuCol,
-          zoneCol,
-          labels: {
-            barcode: getLabel(barcodeCol),
-            sku: skuCol !== -1 ? getLabel(skuCol) : "—",
-            zone: zoneCol !== -1 ? getLabel(zoneCol) : "—"
-          }
-        };
+        return { barcodeCol, skuCol, zoneCol };
       }
 
-      function parseExcelWorkbook(arrayBuffer) {
+      function upsertLookupEntry(targetMap, key, entry) {
+        if (!key) return;
+        const existing = targetMap.get(key);
+        if (!existing) {
+          targetMap.set(key, entry);
+          return;
+        }
+        const existingHasZone = isValidZoneValue(existing.zone);
+        const currentHasZone = isValidZoneValue(entry.zone);
+        if (!existingHasZone && currentHasZone) {
+          targetMap.set(key, {
+            sku: entry.sku || existing.sku,
+            zone: entry.zone,
+            barcode: entry.barcode || existing.barcode
+          });
+        } else {
+          if (!existing.sku && entry.sku) existing.sku = entry.sku;
+          if (!existing.barcode && entry.barcode) existing.barcode = entry.barcode;
+        }
+      }
+
+      function parseExcelWorkbook(arrayBuffer, sourceLabel = "Excel") {
         if (typeof XLSX === "undefined") {
           throw new Error("Librairie SheetJS introuvable. Vérifiez votre connexion Internet.");
         }
 
         const workbook = XLSX.read(arrayBuffer, { type: "array" });
         if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-          throw new Error("Le classeur Excel ne contient aucune feuille.");
+          throw new Error(`Le fichier ${sourceLabel} ne contient aucune feuille.`);
         }
 
-        const firstSheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[firstSheetName];
-        if (!sheet || !sheet["!ref"]) {
-          throw new Error(`La feuille "${firstSheetName}" est vide.`);
-        }
+        const bMap = new Map();
+        const sMap = new Map();
 
-        const range = XLSX.utils.decode_range(sheet["!ref"]);
-        const cols = detectColumns(sheet, range);
+        for (let sIdx = 0; sIdx < workbook.SheetNames.length; sIdx++) {
+          const sheetName = workbook.SheetNames[sIdx];
+          const sheet = workbook.Sheets[sheetName];
+          if (!sheet || !sheet["!ref"]) continue;
 
-        if (cols.barcodeCol === -1) {
-          throw new Error("Impossible d'identifier la colonne Code-barres dans la première feuille.");
-        }
+          const range = XLSX.utils.decode_range(sheet["!ref"]);
+          const cols = detectColumns(sheet, range, { requireBarcode: sIdx === 0 });
 
-        const map = new Map();
-        let rowsProcessed = 0;
+          if (cols.barcodeCol === -1 && cols.skuCol === -1) {
+            if (sIdx === 0) {
+              throw new Error(`Impossible d'identifier les colonnes Code-barres / SKU dans ${sourceLabel}.`);
+            }
+            continue;
+          }
 
-        for (let r = range.s.r + 1; r <= range.e.r; r++) {
-          const barcodeCell = sheet[XLSX.utils.encode_cell({ r, c: cols.barcodeCol })];
-          const barcode = extractCellAsString(barcodeCell);
-          if (!barcode) continue;
+          for (let r = range.s.r + 1; r <= range.e.r; r++) {
+            const barcode =
+              cols.barcodeCol !== -1
+                ? extractCellAsString(sheet[XLSX.utils.encode_cell({ r, c: cols.barcodeCol })])
+                : "";
+            const sku =
+              cols.skuCol !== -1
+                ? extractCellAsString(sheet[XLSX.utils.encode_cell({ r, c: cols.skuCol })])
+                : "";
+            const zone =
+              cols.zoneCol !== -1
+                ? extractCellAsString(sheet[XLSX.utils.encode_cell({ r, c: cols.zoneCol })])
+                : "";
 
-          const sku =
-            cols.skuCol !== -1
-              ? extractCellAsString(sheet[XLSX.utils.encode_cell({ r, c: cols.skuCol })])
-              : "";
-          const zone =
-            cols.zoneCol !== -1
-              ? extractCellAsString(sheet[XLSX.utils.encode_cell({ r, c: cols.zoneCol })])
-              : "";
+            if (!barcode && !sku) continue;
 
-          rowsProcessed++;
-
-          const existing = map.get(barcode);
-          if (!existing) {
-            map.set(barcode, { sku, zone });
-          } else {
-            const existingHasZone = existing.zone && existing.zone.toUpperCase() !== "NO ZONE";
-            const currentHasZone = zone && zone.toUpperCase() !== "NO ZONE";
-            if (!existingHasZone && currentHasZone) {
-              map.set(barcode, { sku: sku || existing.sku, zone });
+            if (barcode) {
+              upsertLookupEntry(bMap, barcode, { sku, zone, barcode });
+            }
+            if (sku) {
+              upsertLookupEntry(sMap, sku.toLowerCase(), { sku, zone, barcode });
             }
           }
         }
 
-        if (map.size === 0) {
-          throw new Error(`Aucun code-barres valide trouvé dans "${firstSheetName}".`);
+        if (bMap.size === 0 && sMap.size === 0) {
+          throw new Error(`Aucun code-barres ou SKU valide trouvé dans ${sourceLabel}.`);
         }
 
         return {
-          map,
-          sheetName: firstSheetName,
-          rowsProcessed,
-          uniqueBarcodes: map.size,
-          labels: cols.labels
+          barcodeMap: bMap,
+          skuMap: sMap,
+          sheetName: workbook.SheetNames[0],
+          uniqueBarcodes: bMap.size,
+          uniqueSkus: sMap.size
         };
       }
 
@@ -737,24 +704,13 @@
         return debounced;
       }
 
-      const uploadSection = document.getElementById("upload-section");
-      const dropZone = document.getElementById("drop-zone");
-      const excelUploadInput = document.getElementById("excel-upload");
-      const uploadLoading = document.getElementById("upload-loading");
-      const uploadError = document.getElementById("upload-error");
-
-      const scannerSection = document.getElementById("scanner-section");
-      const loadedFileNameEl = document.getElementById("loaded-file-name");
-      const loadedFileStatsEl = document.getElementById("loaded-file-stats");
-      const changeFileBtn = document.getElementById("change-file-btn");
+      const dbStatusBadge = document.getElementById("db-status");
+      const retryFetchBtn = document.getElementById("retry-fetch-btn");
+      const dbErrorNotice = document.getElementById("db-error-notice");
 
       const headerStatusBadge = document.getElementById("header-status-badge");
       const headerStatusDot = document.getElementById("header-status-dot");
       const headerStatusLabel = document.getElementById("header-status-label");
-
-      const scannerStatusBadge = document.getElementById("scanner-status-badge");
-      const scannerStatusDot = document.getElementById("scanner-status-dot");
-      const scannerStatusLabel = document.getElementById("scanner-status-label");
       const focusIndicator = document.getElementById("focus-indicator");
 
       const soundToggleBtn = document.getElementById("sound-toggle-btn");
@@ -763,6 +719,7 @@
 
       const barcodeInput = document.getElementById("barcode-input");
       const clearInputBtn = document.getElementById("clear-input-btn");
+      const submitScanBtn = document.getElementById("submit-scan-btn");
       const manualScanForm = document.getElementById("manual-scan-form");
       const cameraToggleBtn = document.getElementById("camera-toggle-btn");
       const cameraBtnLabel = document.getElementById("camera-btn-label");
@@ -773,6 +730,8 @@
 
       const resultPanel = document.getElementById("result-panel");
       const stateIdle = document.getElementById("state-idle");
+      const idleTitle = document.getElementById("idle-title");
+      const idleSubtitle = document.getElementById("idle-subtitle");
       const stateSuccess = document.getElementById("state-success");
       const stateNoZone = document.getElementById("state-nozone");
       const stateError = document.getElementById("state-error");
@@ -788,6 +747,7 @@
 
       const state = {
         isLoaded: false,
+        hasLoadError: false,
         isCameraActive: false,
         isCameraBusy: false,
         html5QrcodeScanner: null,
@@ -805,9 +765,84 @@
 
       /**
        * =========================================================================
-       * 4. UI STATE, AUTO-CLEAR (3s) & FOCUS HELPERS
+       * 4. DATABASE STATUS UI, INPUT LOCKING & FOCUS HELPERS
        * =========================================================================
        */
+      function setInputsDisabled(disabled) {
+        barcodeInput.disabled = disabled;
+        submitScanBtn.disabled = disabled;
+        cameraToggleBtn.disabled = disabled;
+      }
+
+      function renderDbStatusLoading() {
+        state.isLoaded = false;
+        state.hasLoadError = false;
+        setInputsDisabled(true);
+
+        dbErrorNotice.classList.add("hidden");
+        dbErrorNotice.textContent = "";
+        retryFetchBtn.classList.add("hidden");
+
+        dbStatusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border bg-blue-50 text-blue-700 border-blue-200";
+        dbStatusBadge.innerHTML = `
+          <svg class="animate-spin h-4 w-4 text-blue-600 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Initialisation de la base de données...</span>
+        `;
+
+        idleTitle.textContent = "Chargement du zoning...";
+        idleSubtitle.textContent = "Téléchargement automatique du fichier Excel en cours.";
+        updateModeUI();
+      }
+
+      function renderDbStatusReady(articleCount, barcodeCount = articleCount, skuCount = 0) {
+        state.isLoaded = true;
+        state.hasLoadError = false;
+        setInputsDisabled(false);
+
+        dbErrorNotice.classList.add("hidden");
+        retryFetchBtn.classList.add("hidden");
+
+        dbStatusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border bg-green-50 text-green-700 border-green-200";
+        dbStatusBadge.innerHTML = "";
+        const dot = document.createElement("span");
+        dot.className = "w-2 h-2 rounded-full bg-green-500 shrink-0";
+        const label = document.createElement("span");
+        label.textContent = `Base de données Prête (${articleCount.toLocaleString("fr-FR")} articles)`;
+        dbStatusBadge.appendChild(dot);
+        dbStatusBadge.appendChild(label);
+
+        idleTitle.textContent = "En attente de scan";
+        idleSubtitle.textContent = `Douchette USB, caméra mobile ou saisie SKU (${barcodeCount.toLocaleString("fr-FR")} codes-barres, ${skuCount.toLocaleString("fr-FR")} SKU).`;
+        updateModeUI();
+        focusScannerInput();
+      }
+
+      function renderDbStatusError(message) {
+        state.isLoaded = false;
+        state.hasLoadError = true;
+        setInputsDisabled(true);
+
+        dbStatusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border bg-red-50 text-red-700 border-red-200";
+        dbStatusBadge.innerHTML = "";
+        const dot = document.createElement("span");
+        dot.className = "w-2 h-2 rounded-full bg-red-600 shrink-0";
+        const label = document.createElement("span");
+        label.textContent = "Erreur de chargement";
+        dbStatusBadge.appendChild(dot);
+        dbStatusBadge.appendChild(label);
+
+        dbErrorNotice.textContent = message;
+        dbErrorNotice.classList.remove("hidden");
+        retryFetchBtn.classList.remove("hidden");
+
+        idleTitle.textContent = "Base de données indisponible";
+        idleSubtitle.textContent = "Impossible de charger le fichier Excel du dépôt. Vérifiez le fichier puis réessayez.";
+        updateModeUI();
+      }
+
       function focusScannerInput() {
         if (!state.isLoaded || state.isCameraActive) return;
         requestAnimationFrame(() => {
@@ -822,10 +857,21 @@
       }
 
       function updateModeUI() {
+        if (state.hasLoadError) {
+          headerStatusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-semibold border bg-red-50 text-red-700 border-red-200";
+          headerStatusDot.className = "w-2 h-2 rounded-full bg-red-600";
+          headerStatusLabel.textContent = "Hors service";
+          focusIndicator.textContent = "Entrées désactivées";
+          focusIndicator.className = "text-xs font-semibold text-red-600";
+          return;
+        }
+
         if (!state.isLoaded) {
-          headerStatusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-semibold border bg-yellow-50 text-yellow-700 border-yellow-200";
-          headerStatusDot.className = "w-2 h-2 rounded-full bg-yellow-500";
-          headerStatusLabel.textContent = "En attente...";
+          headerStatusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-semibold border bg-blue-50 text-blue-700 border-blue-200";
+          headerStatusDot.className = "w-2 h-2 rounded-full bg-blue-600 animate-pulse";
+          headerStatusLabel.textContent = "Chargement...";
+          focusIndicator.textContent = "Chargement...";
+          focusIndicator.className = "text-xs font-semibold text-slate-400";
           return;
         }
 
@@ -834,28 +880,20 @@
           headerStatusDot.className = "w-2 h-2 rounded-full bg-blue-600 animate-pulse";
           headerStatusLabel.textContent = "Caméra Active";
 
-          scannerStatusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border bg-blue-50 text-blue-700 border-blue-200";
-          scannerStatusDot.className = "w-2 h-2 rounded-full bg-blue-600 animate-pulse";
-          scannerStatusLabel.textContent = "Scan Caméra";
-
           focusIndicator.textContent = "Cliquer pour Douchette";
           focusIndicator.className = "text-xs font-semibold text-amber-600";
 
-          cameraToggleBtn.className = "w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2.5 transition-colors touch-manipulation";
+          cameraToggleBtn.className = "w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2.5 transition-colors touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed";
           cameraBtnLabel.textContent = "Fermer la Caméra";
         } else {
           headerStatusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200";
           headerStatusDot.className = "w-2 h-2 rounded-full bg-emerald-500";
           headerStatusLabel.textContent = "Prêt à scanner";
 
-          scannerStatusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200";
-          scannerStatusDot.className = "w-2 h-2 rounded-full bg-emerald-500";
-          scannerStatusLabel.textContent = "Douchette USB prête";
-
           focusIndicator.textContent = "Focus auto actif";
           focusIndicator.className = "text-xs font-semibold text-emerald-600";
 
-          cameraToggleBtn.className = "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2.5 transition-colors touch-manipulation";
+          cameraToggleBtn.className = "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2.5 transition-colors touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed";
           cameraBtnLabel.textContent = "Ouvrir la Caméra";
         }
       }
@@ -903,23 +941,97 @@
 
       /**
        * =========================================================================
-       * 5. LOOKUP ENGINE
+       * 5. AUTOMATED EXCEL FETCH WITH CACHE-BUSTING
        * =========================================================================
        */
-      function lookupBarcode(rawBarcode) {
-        const code = String(rawBarcode ?? "").trim();
-        if (!code) return null;
+      async function loadZoningDatabase() {
+        renderDbStatusLoading();
 
-        let entry = inventoryMap.get(code);
+        try {
+          if (window.location.protocol === "file:") {
+            throw new Error(
+              "Ouverture en file:// bloquée par le navigateur. Utilisez GitHub Pages (HTTPS) ou un serveur HTTP local."
+            );
+          }
+
+          let lastHttpStatus = null;
+          let matchedPath = null;
+          let data = null;
+
+          for (const candidatePath of EXCEL_CANDIDATE_PATHS) {
+            const cacheBustedUrl = `${candidatePath}?v=${new Date().getTime()}`;
+            const response = await fetch(cacheBustedUrl, { cache: "no-store" });
+
+            if (response.ok) {
+              matchedPath = candidatePath;
+              data = await response.arrayBuffer();
+              break;
+            }
+            lastHttpStatus = response.status;
+          }
+
+          if (!data || !matchedPath) {
+            throw new Error(
+              `Fichier Excel introuvable (zoning.xlsx ou Zonning Smail Platforme.xlsx, HTTP ${lastHttpStatus ?? "erreur"}).`
+            );
+          }
+
+          // Yield one frame so the spinner renders smoothly before SheetJS parses
+          await new Promise((resolve) => setTimeout(resolve, 16));
+
+          const sourceLabel = decodeURIComponent(matchedPath.replace("./", ""));
+          const parsed = parseExcelWorkbook(data, sourceLabel);
+          barcodeMap = parsed.barcodeMap;
+          skuMap = parsed.skuMap;
+          renderDbStatusReady(
+            parsed.uniqueSkus || parsed.uniqueBarcodes,
+            parsed.uniqueBarcodes,
+            parsed.uniqueSkus
+          );
+        } catch (err) {
+          console.error("Erreur lors du chargement automatique du zoning:", err);
+          barcodeMap = new Map();
+          skuMap = new Map();
+          renderDbStatusError(
+            err?.message || "Erreur lors du téléchargement ou de la lecture du fichier Excel."
+          );
+        }
+      }
+
+      retryFetchBtn.addEventListener("click", () => {
+        AudioFeedback.unlock();
+        loadZoningDatabase();
+      });
+
+      /**
+       * =========================================================================
+       * 6. LOOKUP ENGINE (Barcode + Case-Insensitive SKU)
+       * =========================================================================
+       */
+      function lookupItem(rawQuery) {
+        const query = String(rawQuery ?? "").trim();
+        if (!query) return null;
+
+        let entry = barcodeMap.get(query);
+        let matchedBy = "barcode";
 
         // Fallback for UPC-A (12 digits) vs EAN-13 padded with leading zero
-        if (!entry && code.length === 13 && code.startsWith("0")) {
-          entry = inventoryMap.get(code.slice(1));
-        } else if (!entry && code.length === 12) {
-          entry = inventoryMap.get("0" + code);
+        if (!entry && query.length === 13 && query.startsWith("0")) {
+          entry = barcodeMap.get(query.slice(1));
+        } else if (!entry && query.length === 12) {
+          entry = barcodeMap.get("0" + query);
         }
 
-        return { code, entry: entry || null };
+        // Fallback: direct case-insensitive SKU lookup
+        if (!entry) {
+          const skuEntry = skuMap.get(query.toLowerCase());
+          if (skuEntry) {
+            entry = skuEntry;
+            matchedBy = "sku";
+          }
+        }
+
+        return { query, matchedBy, entry: entry || null };
       }
 
       function handleBarcodeScan(rawBarcode, source = "usb") {
@@ -957,7 +1069,7 @@
         stateNoZone.classList.add("hidden");
         stateError.classList.add("hidden");
 
-        const result = lookupBarcode(code);
+        const result = lookupItem(code);
 
         if (!result || !result.entry) {
           resultPanel.className = "relative overflow-hidden bg-gray-50 border border-gray-200 rounded-xl p-4 transition-all";
@@ -969,19 +1081,20 @@
           const { sku, zone } = result.entry;
           const cleanZone = String(zone ?? "").trim();
           const hasValidZone = cleanZone.length > 0 && cleanZone.toUpperCase() !== "NO ZONE";
+          const referenceLabel = result.matchedBy === "sku" ? "Recherche par SKU" : code;
 
           if (!hasValidZone) {
             resultPanel.className = "relative overflow-hidden bg-gray-50 border border-gray-200 rounded-xl p-4 transition-all";
-            noZoneSkuEl.textContent = sku || "SKU non renseigné";
-            noZoneBarcodeEl.textContent = code;
+            noZoneSkuEl.textContent = sku || code;
+            noZoneBarcodeEl.textContent = referenceLabel;
             stateNoZone.classList.remove("hidden");
             countdownBar.className = "h-full bg-red-600";
             AudioFeedback.playError();
           } else {
             resultPanel.className = "relative overflow-hidden bg-gray-50 border border-gray-200 rounded-xl p-4 transition-all";
             resultZoneEl.textContent = cleanZone;
-            resultSkuEl.textContent = sku || "SKU non renseigné";
-            resultBarcodeEl.textContent = code;
+            resultSkuEl.textContent = sku || code;
+            resultBarcodeEl.textContent = referenceLabel;
             stateSuccess.classList.remove("hidden");
             countdownBar.className = "h-full bg-green-600";
             AudioFeedback.playSuccess();
@@ -998,84 +1111,6 @@
 
       /**
        * =========================================================================
-       * 6. EXCEL UPLOAD HANDLERS
-       * =========================================================================
-       */
-      function processUploadedFile(file) {
-        if (!file) return;
-
-        uploadError.classList.add("hidden");
-        uploadError.textContent = "";
-        uploadLoading.classList.remove("hidden");
-
-        setTimeout(async () => {
-          try {
-            const buffer = await file.arrayBuffer();
-            const parsed = parseExcelWorkbook(buffer);
-
-            inventoryMap = parsed.map;
-            state.isLoaded = true;
-            state.lastScanCode = "";
-            state.lastScanAt = 0;
-
-            loadedFileNameEl.textContent = `${file.name} (${parsed.sheetName})`;
-            loadedFileStatsEl.textContent = `${parsed.uniqueBarcodes.toLocaleString("fr-FR")} codes-barres • ${parsed.labels.barcode} / ${parsed.labels.sku} / ${parsed.labels.zone}`;
-
-            uploadSection.classList.add("hidden");
-            scannerSection.classList.remove("hidden");
-            resetToIdleState();
-            updateModeUI();
-            focusScannerInput();
-          } catch (err) {
-            console.error("Erreur lecture Excel:", err);
-            uploadError.textContent = err?.message || "Impossible de lire ce fichier Excel.";
-            uploadError.classList.remove("hidden");
-          } finally {
-            uploadLoading.classList.add("hidden");
-          }
-        }, 30);
-      }
-
-      excelUploadInput.addEventListener("change", (e) => {
-        AudioFeedback.unlock();
-        const file = e.target.files?.[0];
-        if (file) processUploadedFile(file);
-      });
-
-      dropZone.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        dropZone.classList.add("border-blue-500", "bg-blue-50/40");
-      });
-
-      dropZone.addEventListener("dragleave", () => {
-        dropZone.classList.remove("border-blue-500", "bg-blue-50/40");
-      });
-
-      dropZone.addEventListener("drop", (e) => {
-        e.preventDefault();
-        dropZone.classList.remove("border-blue-500", "bg-blue-50/40");
-        const file = e.dataTransfer?.files?.[0];
-        if (file) processUploadedFile(file);
-      });
-
-      changeFileBtn.addEventListener("click", async () => {
-        clearAutoResetTimer();
-        if (state.isCameraActive) {
-          await stopCamera();
-        }
-        state.isLoaded = false;
-        inventoryMap = new Map();
-        excelUploadInput.value = "";
-        barcodeInput.value = "";
-        updateClearBtnVisibility();
-        updateModeUI();
-
-        scannerSection.classList.add("hidden");
-        uploadSection.classList.remove("hidden");
-      });
-
-      /**
-       * =========================================================================
        * 7. HYBRID INPUT LISTENERS (USB DOUCHETTE + MANUAL + CAMERA)
        * =========================================================================
        */
@@ -1088,6 +1123,7 @@
 
       barcodeInput.addEventListener("keydown", (e) => {
         AudioFeedback.unlock();
+        if (!state.isLoaded) return;
 
         const now = performance.now();
         const delta = now - state.lastKeyTime;
@@ -1108,6 +1144,8 @@
 
       barcodeInput.addEventListener("input", () => {
         updateClearBtnVisibility();
+        if (!state.isLoaded) return;
+
         const val = barcodeInput.value.trim();
         if (!val) {
           debouncedUsbScannerSubmit.cancel();
@@ -1120,6 +1158,7 @@
       });
 
       barcodeInput.addEventListener("paste", () => {
+        if (!state.isLoaded) return;
         requestAnimationFrame(() => {
           updateClearBtnVisibility();
           if (barcodeInput.value.trim().length >= 4) {
@@ -1131,8 +1170,9 @@
       manualScanForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         AudioFeedback.unlock();
-        debouncedUsbScannerSubmit.cancel();
+        if (!state.isLoaded) return;
 
+        debouncedUsbScannerSubmit.cancel();
         if (state.isCameraActive) {
           await stopCamera();
         }
@@ -1171,7 +1211,7 @@
       }
 
       async function startCamera() {
-        if (state.isCameraActive || state.isCameraBusy) return;
+        if (!state.isLoaded || state.isCameraActive || state.isCameraBusy) return;
         state.isCameraBusy = true;
         cameraErrorEl.classList.add("hidden");
         cameraErrorEl.textContent = "";
@@ -1254,6 +1294,7 @@
 
       cameraToggleBtn.addEventListener("click", () => {
         AudioFeedback.unlock();
+        if (!state.isLoaded) return;
         if (state.isCameraActive) {
           stopCamera();
         } else {
@@ -1291,8 +1332,12 @@
       window.addEventListener("pagehide", () => {
         if (state.isCameraActive) stopCamera();
       });
+
+      // Automatically fetch and parse the repository zoning Excel file on page load
+      window.addEventListener("DOMContentLoaded", () => {
+        loadZoningDatabase();
+      });
     })();
   </script>
 </body>
 </html>
-```
