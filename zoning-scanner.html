@@ -341,6 +341,14 @@
           ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
           : null;
 
+      function sanitizeBarcode(rawInput) {
+        return String(rawInput ?? "")
+          .replace(/[\n\r\s]+/g, "")
+          .replace(/[\x00-\x1F\x7F\u200B-\u200D\uFEFF]+/g, "")
+          .trim();
+      }
+      window.sanitizeBarcode = sanitizeBarcode;
+
       /**
        * =========================================================================
        * 2. AUDIO FEEDBACK ENGINE (Synthesized Web Audio API)
@@ -686,11 +694,17 @@
       }
 
       async function findItemInSupabase(scannedCode) {
-        // 1. Primary exact barcode lookup
+        const cleanCode = sanitizeBarcode(scannedCode);
+        if (!cleanCode) {
+          return { data: null, matchedBy: "barcode", error: null };
+        }
+
+        // 1. Primary exact barcode lookup (strictly sanitized)
         let { data, error } = await supabaseClient
           .from("warehouse_zoning")
           .select("*")
-          .eq("barcode", scannedCode)
+          .eq("barcode", cleanCode)
+          .limit(1)
           .single();
 
         if (data) {
@@ -700,13 +714,14 @@
           return { data: null, matchedBy: "barcode", error };
         }
 
-        // 2. Fallback for UPC-A (12 digits) read by camera as 13 digits with leading "0"
-        if (/^0\d{12}$/.test(scannedCode)) {
-          const stripped = scannedCode.slice(1);
+        // 2. Fallback for UPC-A (12 digits) vs EAN-13 leading "0" mismatch
+        if (/^0\d{12}$/.test(cleanCode)) {
+          const stripped = sanitizeBarcode(cleanCode.slice(1));
           const upcRes = await supabaseClient
             .from("warehouse_zoning")
             .select("*")
             .eq("barcode", stripped)
+            .limit(1)
             .single();
           if (upcRes.data) {
             return { data: upcRes.data, matchedBy: "barcode", error: null };
@@ -714,10 +729,25 @@
           if (upcRes.error && upcRes.error.code !== "PGRST116") {
             return { data: null, matchedBy: "barcode", error: upcRes.error };
           }
+        } else if (/^\d{12}$/.test(cleanCode)) {
+          const padded = sanitizeBarcode(`0${cleanCode}`);
+          const eanRes = await supabaseClient
+            .from("warehouse_zoning")
+            .select("*")
+            .eq("barcode", padded)
+            .limit(1)
+            .single();
+          if (eanRes.data) {
+            return { data: eanRes.data, matchedBy: "barcode", error: null };
+          }
+          if (eanRes.error && eanRes.error.code !== "PGRST116") {
+            return { data: null, matchedBy: "barcode", error: eanRes.error };
+          }
         }
 
         // 3. Fallback: case-insensitive SKU lookup
-        const escapedSku = scannedCode.replace(/[\\%_]/g, "\\$&");
+        const skuLookupTerm = String(scannedCode ?? "").replace(/[\r\n]+/g, "").trim();
+        const escapedSku = skuLookupTerm.replace(/[\\%_]/g, "\\$&");
         const { data: skuRows, error: skuError } = await supabaseClient
           .from("warehouse_zoning")
           .select("*")
@@ -728,7 +758,7 @@
           return { data: null, matchedBy: "sku", error: skuError };
         }
 
-        const targetLower = scannedCode.toLowerCase();
+        const targetLower = skuLookupTerm.toLowerCase();
         const exactRows = (skuRows || []).filter(
           (row) => String(row.sku ?? "").trim().toLowerCase() === targetLower
         );
@@ -746,6 +776,9 @@
       }
 
       async function handleState1Lookup(scannedCode, source = "usb") {
+        const cleanCode = sanitizeBarcode(scannedCode);
+        if (!cleanCode) return;
+
         if (!supabaseClient) {
           hideAllResultStates();
           errorTitleEl.textContent = "ERREUR SDK";
@@ -778,7 +811,7 @@
               triggerCardFlash();
               scheduleAutoClear();
             } else {
-              state.unknownBarcode = scannedCode;
+              state.unknownBarcode = cleanCode;
               addArticleBtn.classList.remove("hidden");
               renderStatusReady();
               triggerCardFlash();
@@ -789,8 +822,8 @@
           renderStatusReady();
           state.mode = MODE.LOOKUP;
           state.matchedBy = matchedBy;
-          state.activeBarcode = data.barcode || scannedCode;
-          state.activeSku = data.sku || "";
+          state.activeBarcode = sanitizeBarcode(data.barcode || cleanCode);
+          state.activeSku = String(data.sku ?? "").trim();
           state.activeZone = String(data.zone ?? "").trim();
 
           const hasValidZone =
@@ -836,14 +869,16 @@
       }
 
       async function handleState2Relocate() {
-        if (!supabaseClient || (!state.activeBarcode && !state.activeSku)) {
+        const cleanActiveBarcode = sanitizeBarcode(state.activeBarcode);
+        const cleanActiveSku = String(state.activeSku ?? "").replace(/[\r\n]+/g, "").trim().toUpperCase();
+        if (!supabaseClient || (!cleanActiveBarcode && !cleanActiveSku)) {
           resetToIdleState(true);
           return;
         }
         if (state.isBusy) return;
 
-        const newZone = manualZoneInput.value.trim().toUpperCase();
-        if (!newZone) {
+        const newZoneValue = manualZoneInput.value.replace(/[\r\n]+/g, "").trim().toUpperCase();
+        if (!newZoneValue) {
           manualZoneInput.classList.add("border-red-500");
           relocateValidationError.textContent = "Veuillez saisir la nouvelle zone";
           relocateValidationError.classList.remove("hidden");
@@ -862,14 +897,14 @@
 
         try {
           const payload = {
-            zone: newZone,
+            zone: newZoneValue,
             last_updated_at: new Date().toISOString()
           };
 
           const query =
-            state.matchedBy === "sku" && state.activeSku
-              ? supabaseClient.from("warehouse_zoning").update(payload).eq("sku", state.activeSku).select()
-              : supabaseClient.from("warehouse_zoning").update(payload).eq("barcode", state.activeBarcode).select();
+            state.matchedBy === "sku" && cleanActiveSku
+              ? supabaseClient.from("warehouse_zoning").update(payload).eq("sku", state.activeSku.trim()).select()
+              : supabaseClient.from("warehouse_zoning").update(payload).eq("barcode", cleanActiveBarcode).select();
 
           const { data: updatedRows, error } = await query;
 
@@ -891,12 +926,14 @@
           state.activeBarcode = "";
           state.activeSku = "";
           state.activeZone = "";
+          state.lastScanCode = "";
+          state.lastScanAt = 0;
           clearAllVisibleInputs();
           barcodeInput.placeholder = "SKU ou code-barres...";
 
           hideAllResultStates();
           mainCard.className = "relative bg-white border border-gray-200 rounded-2xl shadow-sm p-6 sm:p-8 flex flex-col transition-colors duration-200";
-          relocatedMessageEl.textContent = `Déplacé vers ${newZone}`;
+          relocatedMessageEl.textContent = `Déplacé vers ${newZoneValue}`;
           stateRelocated.classList.remove("hidden");
           countdownBar.className = "h-full bg-green-500";
 
@@ -922,7 +959,9 @@
       }
 
       function enterCreateMode() {
-        if (!state.unknownBarcode) return;
+        const cleanUnknown = sanitizeBarcode(state.unknownBarcode);
+        if (!cleanUnknown) return;
+        state.unknownBarcode = cleanUnknown;
         clearAutoResetTimer();
         hideAllResultStates();
 
@@ -937,7 +976,7 @@
         newZoneInput.classList.remove("border-red-500");
         createValidationError.textContent = "";
         createValidationError.classList.add("hidden");
-        createBarcodeBadge.textContent = state.unknownBarcode;
+        createBarcodeBadge.textContent = cleanUnknown;
 
         mainCard.className = "relative bg-white border border-gray-200 rounded-2xl shadow-sm p-6 sm:p-8 flex flex-col transition-colors duration-200";
         stateCreate.classList.remove("hidden");
@@ -948,14 +987,15 @@
       }
 
       async function handleState3Create() {
-        if (!supabaseClient || !state.unknownBarcode) {
+        const cleanUnknownBarcode = sanitizeBarcode(state.unknownBarcode);
+        if (!supabaseClient || !cleanUnknownBarcode) {
           resetToIdleState(true);
           return;
         }
         if (state.isBusy) return;
 
-        const skuInputValue = newSkuInput.value.trim().toUpperCase();
-        const zoneInputValue = newZoneInput.value.trim().toUpperCase();
+        const skuInputValue = newSkuInput.value.replace(/[\r\n]+/g, "").trim().toUpperCase();
+        const newZoneValue = newZoneInput.value.replace(/[\r\n]+/g, "").trim().toUpperCase();
 
         if (!skuInputValue) {
           newSkuInput.classList.add("border-red-500");
@@ -967,7 +1007,7 @@
           return;
         }
 
-        if (!zoneInputValue) {
+        if (!newZoneValue) {
           newZoneInput.classList.add("border-red-500");
           createValidationError.textContent = "Veuillez saisir la zone de rangement";
           createValidationError.classList.remove("hidden");
@@ -989,9 +1029,9 @@
           const { error } = await supabaseClient
             .from("warehouse_zoning")
             .insert({
-              barcode: state.unknownBarcode,
+              barcode: cleanUnknownBarcode,
               sku: skuInputValue,
-              zone: zoneInputValue
+              zone: newZoneValue
             });
 
           if (error) {
@@ -1013,12 +1053,14 @@
           state.activeSku = "";
           state.activeZone = "";
           state.unknownBarcode = "";
+          state.lastScanCode = "";
+          state.lastScanAt = 0;
           clearAllVisibleInputs();
           barcodeInput.placeholder = "SKU ou code-barres...";
 
           hideAllResultStates();
           mainCard.className = "relative bg-white border border-gray-200 rounded-2xl shadow-sm p-6 sm:p-8 flex flex-col transition-colors duration-200";
-          relocatedMessageEl.textContent = `Créé avec succès dans ${zoneInputValue}`;
+          relocatedMessageEl.textContent = `Créé avec succès dans ${newZoneValue}`;
           stateRelocated.classList.remove("hidden");
           countdownBar.className = "h-full bg-green-500";
 
@@ -1046,13 +1088,15 @@
 
       async function handleScan(rawCode, source = "usb") {
         if (state.mode !== MODE.LOOKUP) return;
-        const scannedCode = String(rawCode ?? "").trim();
-        if (!scannedCode || state.isBusy) return;
+        const rawText = String(rawCode ?? "").replace(/[\r\n]+/g, "").trim();
+        const cleanCode = sanitizeBarcode(rawText);
+        if (!cleanCode || state.isBusy) return;
 
         const now = Date.now();
         const cooldown = source === "camera" ? CAMERA_DUPLICATE_COOLDOWN_MS : USB_DUPLICATE_COOLDOWN_MS;
+        const dedupeKey = `${source}:${cleanCode}`;
 
-        if (scannedCode === state.lastScanCode && now - state.lastScanAt < cooldown) {
+        if (dedupeKey === state.lastScanCode && now - state.lastScanAt < cooldown) {
           if (source !== "camera") {
             barcodeInput.value = "";
             if (source === "usb" || isDesktopPointer()) {
@@ -1062,7 +1106,7 @@
           return;
         }
 
-        state.lastScanCode = scannedCode;
+        state.lastScanCode = dedupeKey;
         state.lastScanAt = now;
         state.rapidBurstCount = 0;
         state.lastKeyTime = 0;
@@ -1071,7 +1115,7 @@
           barcodeInput.value = "";
         }
 
-        await handleState1Lookup(scannedCode, source);
+        await handleState1Lookup(rawText, source);
       }
 
       relocateBtn.addEventListener("click", () => {
@@ -1192,10 +1236,12 @@
        * 6. HYBRID INPUT LISTENERS (USB Douchette + Manual SKU + Camera)
        * =========================================================================
        */
-      const debouncedUsbScannerSubmit = debounce((val) => {
-        const trimmed = String(val ?? "").trim();
-        if (trimmed.length >= 2) {
-          handleScan(trimmed, "usb");
+      const debouncedUsbScannerSubmit = debounce(() => {
+        const rawVal = barcodeInput.value;
+        barcodeInput.value = "";
+        const cleanVal = sanitizeBarcode(rawVal);
+        if (cleanVal.length >= 2) {
+          handleScan(rawVal, "usb");
         }
       }, USB_DEBOUNCE_MS);
 
@@ -1221,20 +1267,22 @@
         if (e.key === "Enter") {
           e.preventDefault();
           debouncedUsbScannerSubmit.cancel();
+          const rawVal = barcodeInput.value;
+          barcodeInput.value = "";
           const source = state.rapidBurstCount >= 5 ? "usb" : "manual";
-          handleScan(barcodeInput.value, source);
+          handleScan(rawVal, source);
         }
       });
 
       barcodeInput.addEventListener("input", () => {
-        const val = barcodeInput.value.trim();
+        const val = sanitizeBarcode(barcodeInput.value);
         if (!val) {
           debouncedUsbScannerSubmit.cancel();
           return;
         }
 
         if (state.rapidBurstCount >= 6) {
-          debouncedUsbScannerSubmit(val);
+          debouncedUsbScannerSubmit();
         } else {
           debouncedUsbScannerSubmit.cancel();
         }
@@ -1244,10 +1292,12 @@
         e.preventDefault();
         AudioFeedback.unlock();
         debouncedUsbScannerSubmit.cancel();
+        const rawVal = barcodeInput.value;
+        barcodeInput.value = "";
         if (state.isCameraActive) {
           await stopCamera();
         }
-        handleScan(barcodeInput.value, "manual");
+        handleScan(rawVal, "manual");
       });
 
       barcodeInput.addEventListener("focus", () => {
