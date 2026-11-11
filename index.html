@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TRADIFOOT — Scanner Zoning</title>
+  <title>TRADIFOOT — WMS Supabase Scanner</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -19,7 +19,7 @@
       }
     };
   </script>
-  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
   <style>
     #reader {
@@ -83,32 +83,37 @@
     .animate-countdown {
       animation: shrinkBar 3000ms linear forwards;
     }
+    @keyframes screenSuccessFlash {
+      0% { opacity: 0.75; }
+      100% { opacity: 0; }
+    }
+    .animate-screen-green {
+      animation: screenSuccessFlash 650ms ease-out forwards;
+    }
   </style>
 </head>
 <body class="bg-slate-50 font-sans text-slate-800 min-h-screen flex items-center justify-center p-4 antialiased">
 
+  <!-- Full-Screen Flash Overlay for Relocation Confirmation -->
+  <div id="screen-flash" class="hidden fixed inset-0 bg-green-500/30 pointer-events-none z-50"></div>
+
   <main class="w-full max-w-md mx-auto flex flex-col gap-4">
 
-    <!-- Ultra-Minimalist Scanner Card -->
+    <!-- Ultra-Minimalist Industrial Scanner Card -->
     <section
+      id="main-card"
       aria-label="TRADIFOOT Scanner Zoning"
-      class="relative bg-white border border-gray-200 rounded-2xl shadow-sm p-6 sm:p-8 flex flex-col"
+      class="relative bg-white border border-gray-200 rounded-2xl shadow-sm p-6 sm:p-8 flex flex-col transition-colors duration-200"
     >
       <!-- Top-Right Micro-Status Indicator -->
       <div
         id="db-status"
         role="status"
         aria-live="polite"
-        title="Initialisation..."
+        title="Prêt"
         class="absolute top-4 right-4 flex items-center justify-center"
       >
-        <span class="relative flex items-center justify-center w-5 h-5">
-          <svg class="animate-spin w-4 h-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-          </svg>
-          <span class="absolute w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-        </span>
+        <span class="block w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
       </div>
 
       <!-- Brand Injection -->
@@ -128,44 +133,66 @@
         </h1>
       </header>
 
-      <!-- Ultra-Clean Scan Result Display -->
+      <!-- Dynamic Result & State Machine Card Area -->
       <div
         id="result-panel"
         aria-live="polite"
-        class="relative py-8 sm:py-10 min-h-[168px] flex flex-col items-center justify-center text-center"
+        class="relative py-8 min-h-[180px] flex flex-col items-center justify-center text-center rounded-xl transition-colors duration-200"
       >
-        <!-- Idle State -->
+        <!-- Idle State (Mode 1 Ready) -->
         <div id="state-idle" class="flex items-center justify-center text-slate-200">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 7V5a1 1 0 011-1h2M17 4h2a1 1 0 011 1v2M4 17v2a1 1 0 001 1h2M17 20h2a1 1 0 001-1v-2M7 8v8M10 8v8M13 8v8M17 8v8" />
           </svg>
         </div>
 
-        <!-- Success State -->
-        <div id="state-success" class="hidden flex flex-col items-center justify-center">
+        <!-- State 1 Lookup Success -->
+        <div id="state-success" class="hidden w-full flex flex-col items-center justify-center">
           <p id="result-zone" class="text-7xl font-black text-slate-900 tracking-tighter leading-none break-words"></p>
           <p id="result-sku" class="text-lg font-medium text-slate-400 mt-3 break-all"></p>
+          <button
+            id="relocate-btn"
+            type="button"
+            class="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-full flex items-center justify-center gap-2 transition-colors touch-manipulation"
+          >
+            🔄 Déplacer l'article
+          </button>
         </div>
 
-        <!-- Found Without Zone -->
-        <div id="state-nozone" class="hidden flex flex-col items-center justify-center">
-          <p class="text-5xl sm:text-6xl font-black text-red-600 tracking-tighter leading-none">NO ZONE</p>
-          <p id="nozone-sku" class="text-lg font-medium text-slate-400 mt-3 break-all"></p>
+        <!-- State 2 Relocation Prompt (Yellow Card) -->
+        <div id="state-relocate" class="hidden w-full bg-yellow-50 border-2 border-yellow-400 rounded-xl p-6 flex flex-col items-center justify-center gap-4">
+          <span class="relative flex h-3 w-3">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+          </span>
+          <p id="relocate-prompt" class="text-xl font-bold text-slate-900 tracking-tight leading-snug"></p>
+          <button
+            id="cancel-relocate-btn"
+            type="button"
+            class="text-xs font-semibold text-slate-500 hover:text-slate-800 underline underline-offset-4 touch-manipulation"
+          >
+            Annuler
+          </button>
         </div>
 
-        <!-- Not Found -->
+        <!-- State 2 Relocation Success (Green Card Confirmation) -->
+        <div id="state-relocated" class="hidden w-full bg-green-50 border-2 border-green-500 rounded-xl p-6 flex flex-col items-center justify-center gap-2">
+          <p id="relocated-message" class="text-2xl sm:text-3xl font-black text-green-700 tracking-tight break-words"></p>
+        </div>
+
+        <!-- Lookup Not Found / Error -->
         <div id="state-error" class="hidden flex flex-col items-center justify-center">
-          <p class="text-6xl font-black text-red-600 tracking-tighter leading-none">INCONNU</p>
+          <p id="error-title" class="text-6xl font-black text-red-600 tracking-tighter leading-none">INCONNU</p>
         </div>
 
         <!-- Auto-Clear Countdown Hairline -->
-        <div id="countdown-track" class="hidden absolute bottom-2 left-8 right-8 h-0.5 bg-slate-100 rounded-full overflow-hidden">
+        <div id="countdown-track" class="hidden absolute bottom-1 left-6 right-6 h-0.5 bg-slate-100 rounded-full overflow-hidden">
           <div id="countdown-bar" class="h-full bg-green-500"></div>
         </div>
       </div>
 
-      <!-- Minimalist Pill Input (SKU Typing + Auto-Focused USB Douchette) -->
-      <form id="manual-scan-form" autocomplete="off" class="relative mt-2">
+      <!-- Minimalist Pill Input (SKU Typing + Auto-Focused USB Douchette in State 1 & 2) -->
+      <form id="usb-scan-form" autocomplete="off" class="relative mt-2">
         <input
           id="barcode-input"
           name="barcode"
@@ -176,17 +203,15 @@
           autocorrect="off"
           autocapitalize="off"
           spellcheck="false"
-          disabled
           placeholder="SKU ou code-barres..."
           aria-label="Saisir SKU ou scanner code-barres"
-          class="w-full h-11 bg-slate-50 border border-gray-200 focus:border-blue-500 focus:bg-white focus:outline-none rounded-full pl-5 pr-12 text-center text-sm font-medium text-slate-800 placeholder-slate-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          class="w-full h-11 bg-slate-50 border border-gray-200 focus:border-blue-500 focus:bg-white focus:outline-none rounded-full pl-5 pr-12 text-center text-sm font-medium text-slate-800 placeholder-slate-400 transition-colors"
         />
         <button
           id="submit-scan-btn"
           type="submit"
-          disabled
-          aria-label="Rechercher SKU"
-          class="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-200/80 hover:bg-blue-600 text-slate-600 hover:text-white flex items-center justify-center transition-colors touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-200/80 disabled:hover:text-slate-600"
+          aria-label="Rechercher"
+          class="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-200/80 hover:bg-blue-600 text-slate-600 hover:text-white flex items-center justify-center transition-colors touch-manipulation"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -194,12 +219,11 @@
         </button>
       </form>
 
-      <!-- Refined Pill-Shaped Camera Button -->
+      <!-- Mobile Camera Trigger Button -->
       <button
         id="camera-toggle-btn"
         type="button"
-        disabled
-        class="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-full flex items-center justify-center gap-2.5 transition-colors touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
+        class="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-full flex items-center justify-center gap-2.5 transition-colors touch-manipulation"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h2l1.5-2h7L17 7h2a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -227,227 +251,23 @@
 
       /**
        * =========================================================================
-       * 1. AUTOMATED EXCEL FETCH & SHEETJS PARSER
+       * 1. SUPABASE INITIALIZATION (Replace placeholders with live credentials)
        * =========================================================================
        */
-      const EXCEL_CANDIDATE_PATHS = [
-        "./zoning.xlsx",
-        "./Zonning%20Smail%20Platforme.xlsx"
-      ];
-      let barcodeMap = new Map();
-      let skuMap = new Map();
+      const SUPABASE_URL = "https://gmdgnzokgqyivlfeosdy.supabase.co";
+      const SUPABASE_ANON_KEY = "sb_publishable_JPqzQ4b11U9BU8HzG16k2g_O2cHl5ur";
 
-      function extractCellAsString(cell) {
-        if (!cell) return "";
-        if (cell.t === "e") return "";
+      const isSupabaseConfigured =
+        SUPABASE_URL &&
+        !SUPABASE_URL.includes("your-project-id") &&
+        SUPABASE_ANON_KEY &&
+        !SUPABASE_ANON_KEY.includes("your-supabase-anon-key");
 
-        if (cell.t === "s" || cell.t === "str") {
-          return String(cell.v ?? "").trim();
-        }
-
-        if (cell.t === "n") {
-          const num = cell.v;
-          if (typeof num !== "number" || !Number.isFinite(num)) {
-            return String(cell.w ?? cell.v ?? "").trim();
-          }
-
-          const formatted = typeof cell.w === "string" ? cell.w.trim() : "";
-          if (/^\d+$/.test(formatted) && Number(formatted) === num) {
-            return formatted;
-          }
-
-          if (Math.abs(num) < 1e20) {
-            return Number.isInteger(num)
-              ? num.toFixed(0).trim()
-              : String(num).trim();
-          }
-
-          return num.toLocaleString("fullwide", { useGrouping: false }).trim();
-        }
-
-        return String(cell.w ?? cell.v ?? "").trim();
-      }
-
-      function normalizeHeaderName(name) {
-        return String(name ?? "")
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, "");
-      }
-
-      function isValidZoneValue(zone) {
-        const clean = String(zone ?? "").trim();
-        return clean.length > 0 && clean.toUpperCase() !== "NO ZONE";
-      }
-
-      function detectColumns(sheet, range, { requireBarcode = true } = {}) {
-        const headerRow = range.s.r;
-        const headers = [];
-
-        for (let c = range.s.c; c <= range.e.c; c++) {
-          const cell = sheet[XLSX.utils.encode_cell({ r: headerRow, c })];
-          headers.push({
-            colIndex: c,
-            raw: extractCellAsString(cell),
-            norm: normalizeHeaderName(extractCellAsString(cell))
-          });
-        }
-
-        let barcodeCol = -1;
-        let skuCol = -1;
-        let zoneCol = -1;
-
-        for (const h of headers) {
-          if (
-            barcodeCol === -1 &&
-            (h.norm.includes("barre") ||
-              h.norm.includes("barcode") ||
-              h.norm === "ean" ||
-              h.norm === "upc" ||
-              h.norm === "gtin" ||
-              h.norm === "cb")
-          ) {
-            barcodeCol = h.colIndex;
-          } else if (
-            skuCol === -1 &&
-            (h.norm.includes("sku") ||
-              h.norm.includes("article") ||
-              h.norm === "ref" ||
-              h.norm.includes("reference"))
-          ) {
-            skuCol = h.colIndex;
-          } else if (
-            zoneCol === -1 &&
-            (h.norm.includes("zone") ||
-              h.norm.includes("formule") ||
-              h.norm === "bin" ||
-              h.norm.includes("emplacement") ||
-              h.norm.includes("location"))
-          ) {
-            zoneCol = h.colIndex;
-          }
-        }
-
-        if (requireBarcode && barcodeCol === -1 && headers.length >= 2) {
-          let bestCol = range.s.c;
-          let bestScore = -1;
-          const sampleEnd = Math.min(range.e.r, headerRow + 15);
-          for (let c = range.s.c; c <= range.e.c; c++) {
-            let score = 0;
-            for (let r = headerRow + 1; r <= sampleEnd; r++) {
-              const val = extractCellAsString(sheet[XLSX.utils.encode_cell({ r, c })]);
-              if (/^\d{8,14}$/.test(val)) score++;
-            }
-            if (score > bestScore) {
-              bestScore = score;
-              bestCol = c;
-            }
-          }
-          if (bestScore > 0) {
-            barcodeCol = bestCol;
-          }
-        }
-
-        const remainingCols = headers
-          .map((h) => h.colIndex)
-          .filter((c) => c !== barcodeCol && c !== skuCol && c !== zoneCol);
-
-        if (skuCol === -1 && remainingCols.length > 0) {
-          skuCol = remainingCols.shift();
-        }
-        if (zoneCol === -1 && remainingCols.length > 0) {
-          zoneCol = remainingCols.shift();
-        }
-
-        return { barcodeCol, skuCol, zoneCol };
-      }
-
-      function upsertLookupEntry(targetMap, key, entry) {
-        if (!key) return;
-        const existing = targetMap.get(key);
-        if (!existing) {
-          targetMap.set(key, entry);
-          return;
-        }
-        const existingHasZone = isValidZoneValue(existing.zone);
-        const currentHasZone = isValidZoneValue(entry.zone);
-        if (!existingHasZone && currentHasZone) {
-          targetMap.set(key, {
-            sku: entry.sku || existing.sku,
-            zone: entry.zone,
-            barcode: entry.barcode || existing.barcode
-          });
-        } else {
-          if (!existing.sku && entry.sku) existing.sku = entry.sku;
-          if (!existing.barcode && entry.barcode) existing.barcode = entry.barcode;
-        }
-      }
-
-      function parseExcelWorkbook(arrayBuffer, sourceLabel = "Excel") {
-        if (typeof XLSX === "undefined") {
-          throw new Error("SheetJS indisponible.");
-        }
-
-        const workbook = XLSX.read(arrayBuffer, { type: "array" });
-        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-          throw new Error(`${sourceLabel} vide.`);
-        }
-
-        const bMap = new Map();
-        const sMap = new Map();
-
-        for (let sIdx = 0; sIdx < workbook.SheetNames.length; sIdx++) {
-          const sheetName = workbook.SheetNames[sIdx];
-          const sheet = workbook.Sheets[sheetName];
-          if (!sheet || !sheet["!ref"]) continue;
-
-          const range = XLSX.utils.decode_range(sheet["!ref"]);
-          const cols = detectColumns(sheet, range, { requireBarcode: sIdx === 0 });
-
-          if (cols.barcodeCol === -1 && cols.skuCol === -1) {
-            if (sIdx === 0) {
-              throw new Error(`Colonnes introuvables dans ${sourceLabel}.`);
-            }
-            continue;
-          }
-
-          for (let r = range.s.r + 1; r <= range.e.r; r++) {
-            const barcode =
-              cols.barcodeCol !== -1
-                ? extractCellAsString(sheet[XLSX.utils.encode_cell({ r, c: cols.barcodeCol })])
-                : "";
-            const sku =
-              cols.skuCol !== -1
-                ? extractCellAsString(sheet[XLSX.utils.encode_cell({ r, c: cols.skuCol })])
-                : "";
-            const zone =
-              cols.zoneCol !== -1
-                ? extractCellAsString(sheet[XLSX.utils.encode_cell({ r, c: cols.zoneCol })])
-                : "";
-
-            if (!barcode && !sku) continue;
-
-            if (barcode) {
-              upsertLookupEntry(bMap, barcode, { sku, zone, barcode });
-            }
-            if (sku) {
-              upsertLookupEntry(sMap, sku.toLowerCase(), { sku, zone, barcode });
-            }
-          }
-        }
-
-        if (bMap.size === 0 && sMap.size === 0) {
-          throw new Error(`Aucune donnée dans ${sourceLabel}.`);
-        }
-
-        return {
-          barcodeMap: bMap,
-          skuMap: sMap,
-          uniqueBarcodes: bMap.size,
-          uniqueSkus: sMap.size
-        };
-      }
+      const supabaseClient =
+        typeof window.supabase !== "undefined" &&
+        typeof window.supabase.createClient === "function"
+          ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+          : null;
 
       /**
        * =========================================================================
@@ -510,7 +330,7 @@
 
       /**
        * =========================================================================
-       * 3. DEBOUNCE, DOM REFERENCES & STATE
+       * 3. DEBOUNCE, DOM REFERENCES & TWO-STEP STATE MACHINE
        * =========================================================================
        */
       function debounce(fn, delayMs) {
@@ -531,12 +351,19 @@
         return debounced;
       }
 
+      const MODE = {
+        LOOKUP: "LOOKUP",
+        RELOCATE: "RELOCATE"
+      };
+
       const brandLogo = document.getElementById("brand-logo");
       const brandFallback = document.getElementById("brand-fallback");
+      const mainCard = document.getElementById("main-card");
       const dbStatusEl = document.getElementById("db-status");
+      const screenFlashEl = document.getElementById("screen-flash");
+
       const barcodeInput = document.getElementById("barcode-input");
-      const submitScanBtn = document.getElementById("submit-scan-btn");
-      const manualScanForm = document.getElementById("manual-scan-form");
+      const usbScanForm = document.getElementById("usb-scan-form");
       const cameraToggleBtn = document.getElementById("camera-toggle-btn");
       const cameraBtnLabel = document.getElementById("camera-btn-label");
       const cameraSection = document.getElementById("camera-section");
@@ -546,17 +373,27 @@
       const resultPanel = document.getElementById("result-panel");
       const stateIdle = document.getElementById("state-idle");
       const stateSuccess = document.getElementById("state-success");
-      const stateNoZone = document.getElementById("state-nozone");
+      const stateRelocate = document.getElementById("state-relocate");
+      const stateRelocated = document.getElementById("state-relocated");
       const stateError = document.getElementById("state-error");
+
       const resultZoneEl = document.getElementById("result-zone");
       const resultSkuEl = document.getElementById("result-sku");
-      const noZoneSkuEl = document.getElementById("nozone-sku");
+      const relocateBtn = document.getElementById("relocate-btn");
+      const relocatePromptEl = document.getElementById("relocate-prompt");
+      const cancelRelocateBtn = document.getElementById("cancel-relocate-btn");
+      const relocatedMessageEl = document.getElementById("relocated-message");
+      const errorTitleEl = document.getElementById("error-title");
       const countdownTrack = document.getElementById("countdown-track");
       const countdownBar = document.getElementById("countdown-bar");
 
       const state = {
-        isLoaded: false,
-        hasLoadError: false,
+        mode: MODE.LOOKUP,
+        matchedBy: "barcode",
+        activeBarcode: "",
+        activeSku: "",
+        activeZone: "",
+        isBusy: false,
         isCameraActive: false,
         isCameraBusy: false,
         html5QrcodeScanner: null,
@@ -574,25 +411,11 @@
 
       /**
        * =========================================================================
-       * 4. MICRO-STATUS DOTS & HYBRID FOCUS CONTROL
+       * 4. STATUS DOT, CARD VISUAL STATES & GHOST USB FOCUS
        * =========================================================================
        */
-      function isDesktopPointer() {
-        return typeof window.matchMedia !== "function" || window.matchMedia("(pointer: fine)").matches;
-      }
-
-      function setInputsDisabled(disabled) {
-        barcodeInput.disabled = disabled;
-        submitScanBtn.disabled = disabled;
-        cameraToggleBtn.disabled = disabled;
-      }
-
-      function renderDbStatusLoading() {
-        state.isLoaded = false;
-        state.hasLoadError = false;
-        setInputsDisabled(true);
-
-        dbStatusEl.title = "Chargement...";
+      function renderStatusBusy() {
+        dbStatusEl.title = "Synchronisation Supabase...";
         dbStatusEl.innerHTML = `
           <span class="relative flex items-center justify-center w-5 h-5">
             <svg class="animate-spin w-4 h-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
@@ -604,39 +427,30 @@
         `;
       }
 
-      function renderDbStatusReady(articleCount) {
-        state.isLoaded = true;
-        state.hasLoadError = false;
-        setInputsDisabled(false);
-
-        dbStatusEl.title = `Prêt (${articleCount.toLocaleString("fr-FR")})`;
-        dbStatusEl.innerHTML = `<span class="block w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>`;
-        focusScannerInput();
+      function renderStatusReady() {
+        if (!supabaseClient || !isSupabaseConfigured) {
+          dbStatusEl.title = "Configurer SUPABASE_URL et SUPABASE_ANON_KEY";
+          dbStatusEl.innerHTML = `<span class="block w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>`;
+        } else {
+          dbStatusEl.title = "Supabase connecté";
+          dbStatusEl.innerHTML = `<span class="block w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>`;
+        }
       }
 
-      function renderDbStatusError(message) {
-        state.isLoaded = false;
-        state.hasLoadError = true;
-        setInputsDisabled(true);
+      function renderStatusError(msg) {
+        dbStatusEl.title = msg || "Erreur Supabase";
+        dbStatusEl.innerHTML = `<span class="block w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>`;
+      }
 
-        dbStatusEl.title = `${message} — Cliquer pour réessayer`;
-        dbStatusEl.innerHTML = "";
-        const retryDot = document.createElement("button");
-        retryDot.type = "button";
-        retryDot.className = "block w-3 h-3 rounded-full bg-red-500 animate-pulse cursor-pointer focus:outline-none";
-        retryDot.setAttribute("aria-label", "Réessayer le chargement");
-        retryDot.addEventListener("click", () => {
-          AudioFeedback.unlock();
-          loadZoningDatabase();
-        });
-        dbStatusEl.appendChild(retryDot);
+      function isDesktopPointer() {
+        return typeof window.matchMedia !== "function" || window.matchMedia("(pointer: fine)").matches;
       }
 
       function focusScannerInput(force = false) {
-        if (!state.isLoaded || state.isCameraActive) return;
+        if (state.isCameraActive) return;
         if (!force && !isDesktopPointer()) return;
         requestAnimationFrame(() => {
-          if (state.isLoaded && !state.isCameraActive && document.activeElement !== barcodeInput) {
+          if (!state.isCameraActive && document.activeElement !== barcodeInput) {
             barcodeInput.focus({ preventScroll: true });
           }
         });
@@ -644,10 +458,10 @@
 
       function updateCameraButtonUI() {
         if (state.isCameraActive) {
-          cameraToggleBtn.className = "mt-3 w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 px-6 rounded-full flex items-center justify-center gap-2.5 transition-colors touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed";
+          cameraToggleBtn.className = "mt-3 w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 px-6 rounded-full flex items-center justify-center gap-2.5 transition-colors touch-manipulation";
           cameraBtnLabel.textContent = "Fermer";
         } else {
-          cameraToggleBtn.className = "mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-full flex items-center justify-center gap-2.5 transition-colors touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600";
+          cameraToggleBtn.className = "mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-full flex items-center justify-center gap-2.5 transition-colors touch-manipulation";
           cameraBtnLabel.textContent = "Scanner";
         }
       }
@@ -659,14 +473,30 @@
         }
       }
 
-      function resetToIdleState() {
-        clearAutoResetTimer();
+      function hideAllResultStates() {
+        stateIdle.classList.add("hidden");
         stateSuccess.classList.add("hidden");
-        stateNoZone.classList.add("hidden");
+        stateRelocate.classList.add("hidden");
+        stateRelocated.classList.add("hidden");
         stateError.classList.add("hidden");
         countdownTrack.classList.add("hidden");
         countdownBar.classList.remove("animate-countdown");
+      }
+
+      function resetToIdleState() {
+        clearAutoResetTimer();
+        hideAllResultStates();
+        state.mode = MODE.LOOKUP;
+        state.matchedBy = "barcode";
+        state.activeBarcode = "";
+        state.activeSku = "";
+        state.activeZone = "";
+        barcodeInput.placeholder = "SKU ou code-barres...";
+        mainCard.className = "relative bg-white border border-gray-200 rounded-2xl shadow-sm p-6 sm:p-8 flex flex-col transition-colors duration-200";
         stateIdle.classList.remove("hidden");
+        if (!state.isCameraActive) {
+          focusScannerInput();
+        }
       }
 
       function scheduleAutoClear() {
@@ -679,105 +509,269 @@
         state.autoClearTimer = setTimeout(() => {
           state.autoClearTimer = null;
           resetToIdleState();
-          if (!state.isCameraActive) {
-            focusScannerInput();
-          }
         }, AUTO_CLEAR_MS);
       }
 
-      function triggerFlashAnimation() {
+      function triggerCardFlash() {
         resultPanel.classList.remove("animate-scan-flash");
         void resultPanel.offsetWidth;
         resultPanel.classList.add("animate-scan-flash");
       }
 
+      function triggerScreenGreenFlash() {
+        screenFlashEl.classList.remove("hidden", "animate-screen-green");
+        void screenFlashEl.offsetWidth;
+        screenFlashEl.classList.add("animate-screen-green");
+        setTimeout(() => {
+          screenFlashEl.classList.add("hidden");
+          screenFlashEl.classList.remove("animate-screen-green");
+        }, 680);
+      }
+
       /**
        * =========================================================================
-       * 5. AUTOMATED FETCH WITH CACHE-BUSTING
+       * 5. TWO-STEP SUPABASE SCAN LOGIC (STATE 1 LOOKUP -> STATE 2 RELOCATION)
        * =========================================================================
        */
-      async function loadZoningDatabase() {
-        renderDbStatusLoading();
+      function enterRelocationMode() {
+        if (!state.activeBarcode && !state.activeSku) return;
+        clearAutoResetTimer();
+        hideAllResultStates();
+
+        state.mode = MODE.RELOCATE;
+        barcodeInput.placeholder = "Nouvelle étagère...";
+        const skuLabel = state.activeSku || state.activeBarcode;
+        relocatePromptEl.textContent = `Scannez la nouvelle étagère pour le SKU: ${skuLabel}`;
+
+        mainCard.className = "relative bg-yellow-50 border-2 border-yellow-400 rounded-2xl shadow-sm p-6 sm:p-8 flex flex-col transition-colors duration-200";
+        stateRelocate.classList.remove("hidden");
+        triggerCardFlash();
+
+        relocateBtn.blur();
+        if (!state.isCameraActive) {
+          focusScannerInput();
+        }
+      }
+
+      async function findItemInSupabase(scannedCode) {
+        // 1. Primary exact barcode lookup
+        let { data, error } = await supabaseClient
+          .from("warehouse_zoning")
+          .select("*")
+          .eq("barcode", scannedCode)
+          .single();
+
+        if (data) {
+          return { data, matchedBy: "barcode", error: null };
+        }
+        if (error && error.code !== "PGRST116") {
+          return { data: null, matchedBy: "barcode", error };
+        }
+
+        // 2. Fallback for UPC-A (12 digits) read by camera as 13 digits with leading "0"
+        if (/^0\d{12}$/.test(scannedCode)) {
+          const stripped = scannedCode.slice(1);
+          const upcRes = await supabaseClient
+            .from("warehouse_zoning")
+            .select("*")
+            .eq("barcode", stripped)
+            .single();
+          if (upcRes.data) {
+            return { data: upcRes.data, matchedBy: "barcode", error: null };
+          }
+          if (upcRes.error && upcRes.error.code !== "PGRST116") {
+            return { data: null, matchedBy: "barcode", error: upcRes.error };
+          }
+        }
+
+        // 3. Fallback: case-insensitive SKU lookup
+        const escapedSku = scannedCode.replace(/[\\%_]/g, "\\$&");
+        const { data: skuRows, error: skuError } = await supabaseClient
+          .from("warehouse_zoning")
+          .select("*")
+          .ilike("sku", escapedSku)
+          .limit(10);
+
+        if (skuError) {
+          return { data: null, matchedBy: "sku", error: skuError };
+        }
+
+        const targetLower = scannedCode.toLowerCase();
+        const exactRows = (skuRows || []).filter(
+          (row) => String(row.sku ?? "").trim().toLowerCase() === targetLower
+        );
+        if (exactRows.length === 0) {
+          return { data: null, matchedBy: "sku", error: null };
+        }
+
+        const preferred =
+          exactRows.find((r) => {
+            const z = String(r.zone ?? "").trim();
+            return z.length > 0 && z.toUpperCase() !== "NO ZONE";
+          }) || exactRows[0];
+
+        return { data: preferred, matchedBy: "sku", error: null };
+      }
+
+      async function handleState1Lookup(scannedCode, source = "usb") {
+        if (!supabaseClient) {
+          hideAllResultStates();
+          errorTitleEl.textContent = "ERREUR SDK";
+          stateError.classList.remove("hidden");
+          AudioFeedback.playError();
+          scheduleAutoClear();
+          return;
+        }
+
+        state.isBusy = true;
+        renderStatusBusy();
 
         try {
-          if (window.location.protocol === "file:") {
-            throw new Error("HTTP/HTTPS requis");
-          }
+          const { data, matchedBy, error } = await findItemInSupabase(scannedCode);
 
-          let lastHttpStatus = null;
-          let matchedPath = null;
-          let data = null;
+          clearAutoResetTimer();
+          hideAllResultStates();
+          mainCard.className = "relative bg-white border border-gray-200 rounded-2xl shadow-sm p-6 sm:p-8 flex flex-col transition-colors duration-200";
 
-          for (const candidatePath of EXCEL_CANDIDATE_PATHS) {
-            const cacheBustedUrl = `${candidatePath}?v=${new Date().getTime()}`;
-            const response = await fetch(cacheBustedUrl, { cache: "no-store" });
-
-            if (response.ok) {
-              matchedPath = candidatePath;
-              data = await response.arrayBuffer();
-              break;
+          if (error || !data) {
+            errorTitleEl.textContent = "INCONNU";
+            stateError.classList.remove("hidden");
+            countdownBar.className = "h-full bg-red-500";
+            AudioFeedback.playError();
+            if (error && error.code !== "PGRST116") {
+              renderStatusError(error.message);
+            } else {
+              renderStatusReady();
             }
-            lastHttpStatus = response.status;
+            triggerCardFlash();
+            scheduleAutoClear();
+            return;
           }
 
-          if (!data || !matchedPath) {
-            throw new Error(`HTTP ${lastHttpStatus ?? "erreur"}`);
+          renderStatusReady();
+          state.mode = MODE.LOOKUP;
+          state.matchedBy = matchedBy;
+          state.activeBarcode = data.barcode || scannedCode;
+          state.activeSku = data.sku || "";
+          state.activeZone = String(data.zone ?? "").trim();
+
+          const hasValidZone =
+            state.activeZone.length > 0 &&
+            state.activeZone.toUpperCase() !== "NO ZONE";
+
+          if (hasValidZone) {
+            resultZoneEl.textContent = state.activeZone;
+            resultZoneEl.className = "text-7xl font-black text-slate-900 tracking-tighter leading-none break-words";
+          } else {
+            resultZoneEl.textContent = "NO ZONE";
+            resultZoneEl.className = "text-5xl sm:text-6xl font-black text-red-600 tracking-tighter leading-none";
           }
 
-          await new Promise((resolve) => setTimeout(resolve, 16));
+          resultSkuEl.textContent = state.activeSku;
+          resultSkuEl.classList.toggle("hidden", !state.activeSku);
+          stateSuccess.classList.remove("hidden");
 
-          const sourceLabel = decodeURIComponent(matchedPath.replace("./", ""));
-          const parsed = parseExcelWorkbook(data, sourceLabel);
-          barcodeMap = parsed.barcodeMap;
-          skuMap = parsed.skuMap;
-          renderDbStatusReady(parsed.uniqueSkus || parsed.uniqueBarcodes);
+          AudioFeedback.playSuccess();
+          triggerCardFlash();
         } catch (err) {
-          console.error("Erreur chargement zoning:", err);
-          barcodeMap = new Map();
-          skuMap = new Map();
-          renderDbStatusError(err?.message || "Erreur de chargement");
-        }
-      }
-
-      /**
-       * =========================================================================
-       * 6. LOOKUP ENGINE (Barcode + Case-Insensitive SKU)
-       * =========================================================================
-       */
-      function lookupItem(rawQuery) {
-        const query = String(rawQuery ?? "").trim();
-        if (!query) return null;
-
-        let entry = barcodeMap.get(query);
-        let matchedBy = "barcode";
-
-        if (!entry && query.length === 13 && query.startsWith("0")) {
-          entry = barcodeMap.get(query.slice(1));
-        } else if (!entry && query.length === 12) {
-          entry = barcodeMap.get("0" + query);
-        }
-
-        if (!entry) {
-          const skuEntry = skuMap.get(query.toLowerCase());
-          if (skuEntry) {
-            entry = skuEntry;
-            matchedBy = "sku";
+          console.error("Erreur lecture Supabase:", err);
+          renderStatusError(err?.message);
+          hideAllResultStates();
+          errorTitleEl.textContent = "ERREUR";
+          stateError.classList.remove("hidden");
+          countdownBar.className = "h-full bg-red-500";
+          AudioFeedback.playError();
+          triggerCardFlash();
+          scheduleAutoClear();
+        } finally {
+          state.isBusy = false;
+          if (!state.isCameraActive) {
+            if (source === "manual" && !isDesktopPointer()) {
+              barcodeInput.blur();
+            } else {
+              focusScannerInput();
+            }
           }
         }
-
-        return { query, matchedBy, entry: entry || null };
       }
 
-      function handleBarcodeScan(rawBarcode, source = "usb") {
-        if (!state.isLoaded) return;
+      async function handleState2Relocate(scannedZone, source = "usb") {
+        if (!supabaseClient || (!state.activeBarcode && !state.activeSku)) {
+          resetToIdleState();
+          return;
+        }
 
-        const code = String(rawBarcode ?? "").trim();
-        if (!code) return;
+        state.isBusy = true;
+        renderStatusBusy();
+
+        try {
+          const payload = {
+            zone: scannedZone,
+            last_updated_at: new Date().toISOString()
+          };
+
+          const query =
+            state.matchedBy === "sku" && state.activeSku
+              ? supabaseClient.from("warehouse_zoning").update(payload).eq("sku", state.activeSku).select()
+              : supabaseClient.from("warehouse_zoning").update(payload).eq("barcode", state.activeBarcode).select();
+
+          const { data: updatedRows, error } = await query;
+
+          if (error || !updatedRows || updatedRows.length === 0) {
+            const msg = error?.message || "Aucune ligne mise à jour (RLS)";
+            renderStatusError(msg);
+            AudioFeedback.playError();
+            relocatePromptEl.textContent = `Erreur: ${msg}`;
+            triggerCardFlash();
+            return;
+          }
+
+          renderStatusReady();
+
+          // Reset to State 1 (Lookup Mode)
+          state.mode = MODE.LOOKUP;
+          state.matchedBy = "barcode";
+          state.activeBarcode = "";
+          state.activeSku = "";
+          state.activeZone = "";
+          barcodeInput.placeholder = "SKU ou code-barres...";
+
+          hideAllResultStates();
+          mainCard.className = "relative bg-white border border-gray-200 rounded-2xl shadow-sm p-6 sm:p-8 flex flex-col transition-colors duration-200";
+          relocatedMessageEl.textContent = `Déplacé vers ${scannedZone}`;
+          stateRelocated.classList.remove("hidden");
+          countdownBar.className = "h-full bg-green-500";
+
+          AudioFeedback.playSuccess();
+          triggerScreenGreenFlash();
+          triggerCardFlash();
+          scheduleAutoClear();
+        } catch (err) {
+          console.error("Erreur mise à jour Supabase:", err);
+          renderStatusError(err?.message);
+          AudioFeedback.playError();
+          relocatePromptEl.textContent = "Erreur réseau — réessayez le scan étagère";
+          triggerCardFlash();
+        } finally {
+          state.isBusy = false;
+          if (!state.isCameraActive) {
+            if (source === "manual" && !isDesktopPointer()) {
+              barcodeInput.blur();
+            } else {
+              focusScannerInput();
+            }
+          }
+        }
+      }
+
+      async function handleScan(rawCode, source = "usb") {
+        const scannedCode = String(rawCode ?? "").trim();
+        if (!scannedCode || state.isBusy) return;
 
         const now = Date.now();
         const cooldown = source === "camera" ? CAMERA_DUPLICATE_COOLDOWN_MS : USB_DUPLICATE_COOLDOWN_MS;
 
-        if (code === state.lastScanCode && now - state.lastScanAt < cooldown) {
+        if (scannedCode === state.lastScanCode && now - state.lastScanAt < cooldown) {
           if (source !== "camera") {
             barcodeInput.value = "";
             if (source === "usb" || isDesktopPointer()) {
@@ -787,7 +781,7 @@
           return;
         }
 
-        state.lastScanCode = code;
+        state.lastScanCode = scannedCode;
         state.lastScanAt = now;
         state.rapidBurstCount = 0;
         state.lastKeyTime = 0;
@@ -796,65 +790,38 @@
           barcodeInput.value = "";
         }
 
-        clearAutoResetTimer();
-        stateIdle.classList.add("hidden");
-        stateSuccess.classList.add("hidden");
-        stateNoZone.classList.add("hidden");
-        stateError.classList.add("hidden");
-
-        const result = lookupItem(code);
-
-        if (!result || !result.entry) {
-          stateError.classList.remove("hidden");
-          countdownBar.className = "h-full bg-red-500";
-          AudioFeedback.playError();
+        if (state.mode === MODE.RELOCATE) {
+          await handleState2Relocate(scannedCode, source);
         } else {
-          const { sku, zone } = result.entry;
-          const cleanZone = String(zone ?? "").trim();
-          const hasValidZone = cleanZone.length > 0 && cleanZone.toUpperCase() !== "NO ZONE";
-
-          if (!hasValidZone) {
-            noZoneSkuEl.textContent = sku || code;
-            stateNoZone.classList.remove("hidden");
-            countdownBar.className = "h-full bg-red-500";
-            AudioFeedback.playError();
-          } else {
-            resultZoneEl.textContent = cleanZone;
-            resultSkuEl.textContent = sku || "";
-            resultSkuEl.classList.toggle("hidden", !sku);
-            stateSuccess.classList.remove("hidden");
-            countdownBar.className = "h-full bg-green-500";
-            AudioFeedback.playSuccess();
-          }
-        }
-
-        triggerFlashAnimation();
-        scheduleAutoClear();
-
-        if (!state.isCameraActive) {
-          if (source === "manual" && !isDesktopPointer()) {
-            barcodeInput.blur();
-          } else {
-            focusScannerInput();
-          }
+          await handleState1Lookup(scannedCode, source);
         }
       }
 
+      relocateBtn.addEventListener("click", () => {
+        AudioFeedback.unlock();
+        enterRelocationMode();
+      });
+
+      cancelRelocateBtn.addEventListener("click", () => {
+        AudioFeedback.unlock();
+        cancelRelocateBtn.blur();
+        resetToIdleState();
+      });
+
       /**
        * =========================================================================
-       * 7. HYBRID INPUT LISTENERS (USB Douchette + Manual SKU + Camera)
+       * 6. HYBRID INPUT LISTENERS (USB Douchette + Manual SKU + Camera)
        * =========================================================================
        */
       const debouncedUsbScannerSubmit = debounce((val) => {
         const trimmed = String(val ?? "").trim();
-        if (trimmed.length >= 4) {
-          handleBarcodeScan(trimmed, "usb");
+        if (trimmed.length >= 2) {
+          handleScan(trimmed, "usb");
         }
       }, USB_DEBOUNCE_MS);
 
       barcodeInput.addEventListener("keydown", (e) => {
         AudioFeedback.unlock();
-        if (!state.isLoaded) return;
 
         if (e.isComposing || e.key === "Unidentified") {
           state.rapidBurstCount = 0;
@@ -876,20 +843,17 @@
           e.preventDefault();
           debouncedUsbScannerSubmit.cancel();
           const source = state.rapidBurstCount >= 5 ? "usb" : "manual";
-          handleBarcodeScan(barcodeInput.value, source);
+          handleScan(barcodeInput.value, source);
         }
       });
 
       barcodeInput.addEventListener("input", () => {
-        if (!state.isLoaded) return;
-
         const val = barcodeInput.value.trim();
         if (!val) {
           debouncedUsbScannerSubmit.cancel();
           return;
         }
 
-        // Only auto-submit when sustained rapid HID scanner keystrokes occur (< 35ms each)
         if (state.rapidBurstCount >= 6) {
           debouncedUsbScannerSubmit(val);
         } else {
@@ -897,16 +861,14 @@
         }
       });
 
-      manualScanForm.addEventListener("submit", async (e) => {
+      usbScanForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         AudioFeedback.unlock();
-        if (!state.isLoaded) return;
-
         debouncedUsbScannerSubmit.cancel();
         if (state.isCameraActive) {
           await stopCamera();
         }
-        handleBarcodeScan(barcodeInput.value, "manual");
+        handleScan(barcodeInput.value, "manual");
       });
 
       barcodeInput.addEventListener("focus", () => {
@@ -915,7 +877,7 @@
 
       /**
        * =========================================================================
-       * 8. CAMERA SCANNER (html5-qrcode)
+       * 7. CAMERA SCANNER (html5-qrcode — Works dynamically in State 1 & State 2)
        * =========================================================================
        */
       function stopDanglingVideoTracks() {
@@ -929,7 +891,7 @@
       }
 
       async function startCamera() {
-        if (!state.isLoaded || state.isCameraActive || state.isCameraBusy) return;
+        if (state.isCameraActive || state.isCameraBusy) return;
         state.isCameraBusy = true;
         cameraErrorEl.classList.add("hidden");
         cameraErrorEl.textContent = "";
@@ -975,7 +937,7 @@
 
           state.html5QrcodeScanner = new Html5QrcodeScanner("reader", config, /* verbose= */ false);
           state.html5QrcodeScanner.render(
-            (decodedText) => handleBarcodeScan(decodedText, "camera"),
+            (decodedText) => handleScan(decodedText, "camera"),
             () => {}
           );
 
@@ -1012,7 +974,7 @@
 
       cameraToggleBtn.addEventListener("click", () => {
         AudioFeedback.unlock();
-        if (!state.isLoaded) return;
+        cameraToggleBtn.blur();
         if (state.isCameraActive) {
           stopCamera();
         } else {
@@ -1022,13 +984,13 @@
 
       document.addEventListener("click", (e) => {
         AudioFeedback.unlock();
-        if (!state.isLoaded || state.isCameraActive) return;
+        if (state.isCameraActive) return;
         const interactive = e.target.closest("button, input, select, a, #camera-section");
         if (!interactive) focusScannerInput();
       });
 
       window.addEventListener("focus", () => {
-        if (state.isLoaded && !state.isCameraActive) {
+        if (!state.isCameraActive) {
           focusScannerInput();
         }
       });
@@ -1042,7 +1004,8 @@
           brandLogo.classList.add("hidden");
           brandFallback.classList.remove("hidden");
         }
-        loadZoningDatabase();
+        renderStatusReady();
+        focusScannerInput();
       });
     })();
   </script>
