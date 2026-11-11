@@ -3,15 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SARL TRADIFOOT — WMS Scanner Excel Standalone</title>
+  <title>SARL TRADIFOOT — WMS Scanner Zoning</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif']
+          }
+        }
+      }
+    };
+  </script>
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
   <style>
     #reader {
-      border: 2px solid #cbd5e1 !important;
-      background-color: #0f172a;
-      color: #f8fafc;
+      border: 1px solid #e5e7eb !important;
+      border-radius: 0.75rem;
+      background-color: #f9fafb;
+      color: #1e293b;
+      overflow: hidden;
     }
     #reader img {
       display: inline-block;
@@ -22,25 +38,30 @@
       background-color: #2563eb !important;
       color: #ffffff !important;
       border: none !important;
-      border-radius: 0.5rem !important;
-      padding: 0.6rem 1rem !important;
+      border-radius: 0.75rem !important;
+      padding: 0.65rem 1rem !important;
       font-weight: 700 !important;
-      font-size: 0.95rem !important;
+      font-size: 0.875rem !important;
       cursor: pointer !important;
       margin: 0.35rem 0.25rem !important;
       touch-action: manipulation;
     }
+    #reader__dashboard_section_csr button:hover,
+    #reader__dashboard_section_fsr button:hover,
+    #reader button:hover {
+      background-color: #1d4ed8 !important;
+    }
     #reader select {
-      background-color: #1e293b !important;
-      color: #f8fafc !important;
-      border: 1px solid #475569 !important;
+      background-color: #ffffff !important;
+      color: #1e293b !important;
+      border: 1px solid #d1d5db !important;
       border-radius: 0.5rem !important;
       padding: 0.5rem 0.75rem !important;
-      font-size: 0.95rem !important;
+      font-size: 0.875rem !important;
       max-width: 100%;
     }
     #reader a {
-      color: #60a5fa !important;
+      color: #2563eb !important;
       text-decoration: underline !important;
     }
     #reader__scan_region video {
@@ -48,12 +69,12 @@
       object-fit: cover;
     }
     @keyframes scanFlash {
-      0% { transform: scale(0.985); }
+      0% { transform: scale(0.99); }
       50% { transform: scale(1.01); }
       100% { transform: scale(1); }
     }
     .animate-scan-flash {
-      animation: scanFlash 220ms ease-out;
+      animation: scanFlash 200ms ease-out;
     }
     @keyframes shrinkBar {
       from { width: 100%; }
@@ -64,40 +85,42 @@
     }
   </style>
 </head>
-<body class="bg-slate-900 text-slate-900 min-h-screen flex flex-col antialiased">
+<body class="bg-slate-50 font-sans text-slate-800 min-h-screen flex flex-col antialiased">
 
-  <!-- Top Header -->
-  <header class="w-full bg-slate-950 text-white border-b border-slate-800 sticky top-0 z-20">
-    <div class="max-w-xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-      <div>
-        <div class="flex items-center gap-2">
-          <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-green-600 text-white font-black text-sm tracking-tight">TF</span>
-          <h1 class="text-lg sm:text-xl font-black tracking-tight leading-none">
+  <!-- Delivery Dashboard Header -->
+  <header class="w-full bg-white border-b border-gray-200 sticky top-0 z-20">
+    <div class="max-w-xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <span class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-blue-600 text-white font-bold text-sm tracking-tight shrink-0">
+          TF
+        </span>
+        <div class="min-w-0">
+          <h1 class="text-base sm:text-lg font-bold tracking-tight text-slate-800 leading-tight truncate">
             SARL TRADIFOOT
           </h1>
+          <p class="text-xs font-medium text-slate-500 truncate">
+            WMS • Localisation Zoning
+          </p>
         </div>
-        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400 mt-1">
-          WMS • Scanner Zoning Excel
-        </p>
       </div>
 
-      <div class="flex items-center gap-2">
-        <div
-          id="mode-badge"
-          class="hidden inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border border-green-500/40 bg-green-500/15 text-green-400"
+      <div class="flex items-center gap-2 shrink-0">
+        <span
+          id="header-status-badge"
+          class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-semibold border bg-yellow-50 text-yellow-700 border-yellow-200"
         >
-          <span id="mode-dot" class="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse"></span>
-          <span id="mode-label">Douchette USB</span>
-        </div>
+          <span id="header-status-dot" class="w-2 h-2 rounded-full bg-yellow-500"></span>
+          <span id="header-status-label">En attente...</span>
+        </span>
 
         <button
           id="sound-toggle-btn"
           type="button"
           aria-label="Activer ou couper le son"
           title="Son activé"
-          class="p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 transition touch-manipulation"
+          class="p-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-slate-700 transition-colors touch-manipulation"
         >
-          <svg id="icon-sound-on" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <svg id="icon-sound-on" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z" />
             <path stroke-linecap="round" stroke-linejoin="round" d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14" />
           </svg>
@@ -113,35 +136,43 @@
   <main class="flex-1 w-full max-w-xl mx-auto px-4 py-5 flex flex-col gap-4">
 
     <!-- ===================================================================== -->
-    <!-- SECTION 1: EXCEL FILE INGESTION (Visible until file is loaded)        -->
+    <!-- SECTION 1: EXCEL FILE INGESTION (Delivery Card Style)                 -->
     <!-- ===================================================================== -->
     <section
       id="upload-section"
       aria-label="Importation du fichier Excel"
-      class="bg-white rounded-3xl border-2 border-slate-200 p-6 sm:p-8 shadow-2xl flex flex-col gap-5"
+      class="bg-white border border-gray-200 rounded-2xl shadow-sm p-5 flex flex-col gap-4"
     >
-      <div class="text-center">
-        <div class="mx-auto w-16 h-16 rounded-2xl bg-green-50 border-2 border-green-200 flex items-center justify-center text-green-600 mb-3">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-9 h-9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-bold text-slate-800 tracking-tight">Charger le fichier Zoning</h2>
+          <p class="text-sm text-slate-500 mt-0.5">
+            Importez le fichier Excel (<span class="font-mono">.xlsx</span>, <span class="font-mono">.xls</span>) pour activer le scanner.
+          </p>
         </div>
-        <h2 class="text-2xl font-black text-slate-900">Charger le fichier Zoning</h2>
-        <p class="text-sm text-gray-600 mt-1">
-          Sélectionnez le fichier Excel (<span class="font-mono font-semibold">.xlsx</span> / <span class="font-mono font-semibold">.xls</span>) contenant les colonnes Code-barres, SKU et Zone.
-        </p>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border bg-yellow-50 text-yellow-700 border-yellow-200 shrink-0">
+          En attente
+        </span>
       </div>
 
       <label
         id="drop-zone"
         for="excel-upload"
-        class="cursor-pointer rounded-2xl border-2 border-dashed border-slate-300 hover:border-green-600 hover:bg-green-50/40 bg-slate-50 p-6 text-center transition flex flex-col items-center gap-3"
+        class="cursor-pointer rounded-xl border-2 border-dashed border-gray-200 hover:border-blue-400 bg-gray-50 p-5 text-center transition-colors flex flex-col items-center gap-3"
       >
-        <span class="px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-extrabold text-sm sm:text-base shadow">
-          Choisir un fichier Excel
-        </span>
-        <span class="text-xs text-gray-500">
-          ou glisser-déposer le fichier ici (traitement 100% local, sans serveur)
+        <div class="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-blue-600">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+        </div>
+        <div class="text-sm text-slate-500">
+          Glissez-déposez votre fichier ici ou sélectionnez-le ci-dessous
+        </div>
+        <span class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <span>Importer le fichier Excel</span>
         </span>
         <input
           type="file"
@@ -151,191 +182,251 @@
         />
       </label>
 
-      <div id="upload-loading" class="hidden flex items-center justify-center gap-3 py-2 text-slate-700 font-bold text-sm">
-        <div class="w-5 h-5 rounded-full border-2 border-slate-300 border-t-green-600 animate-spin"></div>
-        <span>Lecture et indexation des codes-barres en cours...</span>
+      <div id="upload-loading" class="hidden flex items-center justify-center gap-2.5 py-2 text-slate-700 font-semibold text-sm">
+        <div class="w-4 h-4 rounded-full border-2 border-gray-300 border-t-blue-600 animate-spin"></div>
+        <span>Indexation des codes-barres en cours...</span>
       </div>
 
-      <div id="upload-error" class="hidden rounded-xl bg-red-50 border border-red-300 p-3 text-sm font-bold text-red-700 text-center"></div>
+      <div id="upload-error" class="hidden rounded-xl bg-red-50 border border-red-200 p-3 text-sm font-semibold text-red-700 text-center"></div>
     </section>
 
     <!-- ===================================================================== -->
-    <!-- SECTION 2: SCANNER UI (Revealed once Excel is loaded into memory)     -->
+    <!-- SECTION 2: MAIN SCANNER DELIVERY CARD                                 -->
     <!-- ===================================================================== -->
     <div id="scanner-section" class="hidden flex flex-col gap-4">
 
-      <!-- Loaded File Summary Banner -->
-      <div class="bg-slate-800/90 text-white border border-slate-700 rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3">
-        <div class="min-w-0">
-          <p id="loaded-file-name" class="text-sm font-bold text-green-400 truncate"></p>
-          <p id="loaded-file-stats" class="text-xs text-slate-300 truncate"></p>
-        </div>
-        <button
-          id="change-file-btn"
-          type="button"
-          class="shrink-0 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-bold text-white border border-slate-600 transition touch-manipulation"
-        >
-          Changer Excel
-        </button>
-      </div>
-
-      <!-- Hybrid Input Bar (Auto-focused for USB Douchette + Manual Entry) -->
-      <section aria-label="Saisie code-barres" class="bg-white rounded-2xl border-2 border-slate-200 p-3 sm:p-4 shadow-lg">
-        <div class="flex items-center justify-between mb-2">
-          <label for="barcode-input" class="text-xs font-extrabold uppercase tracking-wider text-gray-700">
-            Douchette USB / Saisie manuelle
-          </label>
-          <span id="focus-indicator" class="text-xs font-bold text-green-600">
-            Focus auto actif
-          </span>
-        </div>
-
-        <form id="manual-scan-form" class="flex items-stretch gap-2" autocomplete="off">
-          <div class="relative flex-1">
-            <input
-              id="barcode-input"
-              name="barcode"
-              type="text"
-              inputmode="text"
-              autocomplete="off"
-              autocorrect="off"
-              autocapitalize="off"
-              spellcheck="false"
-              placeholder="Scanner une boîte ou saisir le code..."
-              class="w-full h-12 sm:h-14 pl-4 pr-10 rounded-xl bg-slate-50 border-2 border-slate-300 focus:border-green-600 focus:bg-white focus:outline-none text-slate-900 placeholder-slate-400 font-mono text-base sm:text-lg font-bold tracking-wide transition"
-            />
-            <button
-              id="clear-input-btn"
-              type="button"
-              aria-label="Effacer le champ"
-              class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+      <section
+        aria-label="Scanner Zoning"
+        class="bg-white border border-gray-200 rounded-2xl shadow-sm p-5 flex flex-col gap-4"
+      >
+        <!-- Card Top Bar: File Info & Status Pill Badge -->
+        <div class="flex items-start justify-between gap-3 pb-3 border-b border-gray-100">
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2 mb-1">
+              <span
+                id="scanner-status-badge"
+                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200"
+              >
+                <span id="scanner-status-dot" class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span id="scanner-status-label">Prêt à scanner</span>
+              </span>
+            </div>
+            <p id="loaded-file-name" class="text-sm font-semibold text-slate-800 truncate"></p>
+            <p id="loaded-file-stats" class="text-xs text-slate-500 truncate"></p>
           </div>
 
           <button
-            type="submit"
-            class="h-12 sm:h-14 px-4 sm:px-5 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-700 text-white font-extrabold text-sm sm:text-base tracking-wide transition touch-manipulation"
+            id="change-file-btn"
+            type="button"
+            class="shrink-0 px-3 py-1.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-xs font-semibold text-slate-700 border border-gray-200 transition-colors touch-manipulation"
           >
-            OK
+            Changer Excel
           </button>
-        </form>
+        </div>
+
+        <!-- Hybrid Input Bar (Auto-focused for USB Douchette + Manual Entry) -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label for="barcode-input" class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Douchette USB / Saisie manuelle
+            </label>
+            <span id="focus-indicator" class="text-xs font-semibold text-emerald-600">
+              Focus auto actif
+            </span>
+          </div>
+
+          <form id="manual-scan-form" class="flex items-stretch gap-2" autocomplete="off">
+            <div class="relative flex-1">
+              <input
+                id="barcode-input"
+                name="barcode"
+                type="text"
+                inputmode="text"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
+                placeholder="Scanner un code-barres ou saisir..."
+                class="w-full h-12 pl-3.5 pr-9 rounded-xl bg-gray-50 border border-gray-200 focus:border-blue-600 focus:bg-white focus:outline-none text-slate-800 placeholder-slate-400 font-mono text-sm sm:text-base font-semibold tracking-wide transition-colors"
+              />
+              <button
+                id="clear-input-btn"
+                type="button"
+                aria-label="Effacer le champ"
+                class="hidden absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-gray-200 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <button
+              type="submit"
+              class="h-12 px-4 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-sm tracking-wide transition-colors touch-manipulation"
+            >
+              OK
+            </button>
+          </form>
+        </div>
+
+        <!-- Camera Toggle Action Button (LIVRER style) -->
+        <button
+          id="camera-toggle-btn"
+          type="button"
+          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2.5 transition-colors touch-manipulation"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h2l1.5-2h7L17 7h2a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+            <circle cx="12" cy="13" r="3.5" />
+          </svg>
+          <span id="camera-btn-label">Ouvrir la Caméra</span>
+        </button>
+
+        <!-- Result Container (Delivery Destination Format) -->
+        <div
+          id="result-panel"
+          aria-live="polite"
+          class="relative overflow-hidden bg-gray-50 border border-gray-200 rounded-xl p-4 transition-all"
+        >
+          <!-- Idle State -->
+          <div id="state-idle" class="py-5 flex flex-col items-center justify-center text-center gap-2">
+            <div class="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-slate-400">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 7V5a1 1 0 011-1h2M17 4h2a1 1 0 011 1v2M4 17v2a1 1 0 001 1h2M17 20h2a1 1 0 001-1v-2M7 8v8M10 8v8M13 8v8M17 8v8" />
+              </svg>
+            </div>
+            <p class="text-base font-bold text-slate-800 tracking-tight">En attente de scan</p>
+            <p class="text-xs text-slate-500 max-w-xs">
+              Bippez une boîte avec la douchette USB ou utilisez la caméra mobile.
+            </p>
+          </div>
+
+          <!-- Found with Valid Zone (Client Name = SKU + License Plate = Zone) -->
+          <div id="state-success" class="hidden flex flex-col gap-3">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Article / SKU
+                </span>
+                <p id="result-sku" class="text-xl font-bold text-slate-800 tracking-tight break-all"></p>
+              </div>
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0">
+                Zone trouvée
+              </span>
+            </div>
+
+            <!-- Massive Destination Tag / License Plate Block -->
+            <div class="bg-white border-2 border-green-500 rounded-xl p-4 text-center">
+              <span class="block text-[11px] font-bold uppercase tracking-widest text-green-700 mb-1">
+                Destination Zoning
+              </span>
+              <p
+                id="result-zone"
+                class="text-6xl font-black text-green-600 tracking-tight break-words leading-none"
+              ></p>
+            </div>
+
+            <div class="flex items-center justify-between text-xs text-slate-500 pt-0.5">
+              <span>Code-barres scanné</span>
+              <span id="result-barcode" class="font-mono font-semibold text-slate-700"></span>
+            </div>
+          </div>
+
+          <!-- Found SKU but Empty Zone / NO ZONE -->
+          <div id="state-nozone" class="hidden flex flex-col gap-3">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Article / SKU
+                </span>
+                <p id="nozone-sku" class="text-xl font-bold text-slate-800 tracking-tight break-all"></p>
+              </div>
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-red-50 text-red-700 border-red-200 shrink-0">
+                Sans zone
+              </span>
+            </div>
+
+            <div class="bg-red-50 border-2 border-red-400 rounded-xl p-4 text-center">
+              <span class="block text-[11px] font-bold uppercase tracking-widest text-red-700 mb-1">
+                Emplacement Non Attribué
+              </span>
+              <p class="text-6xl font-black text-red-600 tracking-tight leading-none">
+                NO ZONE
+              </p>
+            </div>
+
+            <div class="flex items-center justify-between text-xs text-slate-500 pt-0.5">
+              <span>Code-barres scanné</span>
+              <span id="nozone-barcode" class="font-mono font-semibold text-slate-700"></span>
+            </div>
+          </div>
+
+          <!-- Not Found -->
+          <div id="state-error" class="hidden flex flex-col gap-3">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Statut Article
+                </span>
+                <p class="text-xl font-bold text-slate-800 tracking-tight">Code-barres introuvable</p>
+              </div>
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-red-50 text-red-700 border-red-200 shrink-0">
+                Non répertorié
+              </span>
+            </div>
+
+            <div class="bg-red-50 border-2 border-red-400 rounded-xl p-4 text-center">
+              <span class="block text-[11px] font-bold uppercase tracking-widest text-red-700 mb-1">
+                Destination
+              </span>
+              <p class="text-6xl font-black text-red-600 tracking-tight leading-none">
+                INCONNU
+              </p>
+            </div>
+
+            <div class="flex items-center justify-between text-xs text-slate-500 pt-0.5">
+              <span>Code-barres scanné</span>
+              <span id="error-barcode" class="font-mono font-semibold text-red-700"></span>
+            </div>
+          </div>
+
+          <!-- 3-Second Auto-Clear Progress Indicator -->
+          <div id="countdown-track" class="hidden absolute bottom-0 left-0 right-0 h-1 bg-gray-200">
+            <div id="countdown-bar" class="h-full bg-blue-600"></div>
+          </div>
+        </div>
       </section>
 
-      <!-- Prominent Camera Toggle Button -->
-      <button
-        id="camera-toggle-btn"
-        type="button"
-        class="w-full min-h-[56px] py-3.5 px-5 rounded-2xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-black text-lg tracking-wide shadow-lg border-2 border-blue-400/30 flex items-center justify-center gap-3 transition touch-manipulation"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h2l1.5-2h7L17 7h2a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-          <circle cx="12" cy="13" r="3.5" />
-        </svg>
-        <span id="camera-btn-label">Ouvrir la Caméra</span>
-      </button>
-
-      <!-- High-Contrast Lookup Result Panel -->
-      <section
-        id="result-panel"
-        aria-live="polite"
-        class="relative overflow-hidden rounded-3xl border-4 border-slate-200 bg-white p-6 sm:p-8 text-center shadow-2xl transition-all"
-      >
-        <!-- Idle State -->
-        <div id="state-idle" class="py-5 flex flex-col items-center justify-center gap-2.5">
-          <div class="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-9 h-9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 7V5a1 1 0 011-1h2M17 4h2a1 1 0 011 1v2M4 17v2a1 1 0 001 1h2M17 20h2a1 1 0 001-1v-2M7 8v8M10 8v8M13 8v8M17 8v8" />
-            </svg>
-          </div>
-          <p class="text-xl sm:text-2xl font-black text-slate-900">Prêt à scanner</p>
-          <p class="text-sm text-gray-600 max-w-xs">
-            Scannez un code-barres avec la douchette USB ou ouvrez la caméra.
-          </p>
-        </div>
-
-        <!-- Found with Valid Zone -->
-        <div id="state-success" class="hidden py-2 flex flex-col items-center justify-center gap-2">
-          <span class="inline-block px-3 py-1 rounded-full bg-green-100 border border-green-300 text-green-800 text-xs font-extrabold uppercase tracking-widest">
-            Zone de Stockage
-          </span>
-          <p
-            id="result-zone"
-            class="text-6xl sm:text-7xl font-black text-green-600 tracking-tight break-words leading-none my-3"
-          ></p>
-          <div class="w-full pt-3 border-t border-slate-200 flex flex-col items-center gap-1">
-            <span class="text-xs font-bold uppercase tracking-widest text-gray-500">SKU</span>
-            <p id="result-sku" class="text-2xl sm:text-3xl font-extrabold text-gray-800 tracking-wide break-all"></p>
-            <p id="result-barcode" class="text-sm font-mono text-gray-500 mt-1"></p>
-          </div>
-        </div>
-
-        <!-- Found SKU but Empty Zone / NO ZONE -->
-        <div id="state-nozone" class="hidden py-2 flex flex-col items-center justify-center gap-2">
-          <span class="inline-block px-3 py-1 rounded-full bg-red-100 border border-red-300 text-red-800 text-xs font-extrabold uppercase tracking-widest">
-            Aucune Zone Attribuée
-          </span>
-          <p class="text-6xl sm:text-7xl font-black text-red-600 tracking-tight leading-none my-3">
-            NO ZONE
-          </p>
-          <div class="w-full pt-3 border-t border-red-200 flex flex-col items-center gap-1">
-            <span class="text-xs font-bold uppercase tracking-widest text-gray-500">SKU</span>
-            <p id="nozone-sku" class="text-2xl sm:text-3xl font-extrabold text-gray-800 tracking-wide break-all"></p>
-            <p id="nozone-barcode" class="text-sm font-mono text-gray-600 mt-1"></p>
-          </div>
-        </div>
-
-        <!-- Not Found -->
-        <div id="state-error" class="hidden py-3 flex flex-col items-center justify-center gap-2">
-          <span class="inline-block px-3 py-1 rounded-full bg-red-100 border border-red-300 text-red-800 text-xs font-extrabold uppercase tracking-widest">
-            Code-Barres Non Trouvé
-          </span>
-          <p class="text-6xl sm:text-7xl font-black text-red-600 tracking-tight leading-none my-3">
-            INCONNU
-          </p>
-          <p id="error-barcode" class="text-sm sm:text-base font-mono text-red-800 bg-red-100 px-3 py-1.5 rounded-lg border border-red-200"></p>
-        </div>
-
-        <!-- 3-Second Auto-Clear Progress Indicator -->
-        <div id="countdown-track" class="hidden absolute bottom-0 left-0 right-0 h-1.5 bg-slate-200">
-          <div id="countdown-bar" class="h-full bg-slate-500"></div>
-        </div>
-      </section>
-
-      <!-- Camera Scanner Container -->
+      <!-- Camera Scanner Card -->
       <section
         id="camera-section"
         aria-label="Scanner Caméra"
-        class="hidden rounded-2xl border-2 border-blue-500 bg-slate-950 p-3 sm:p-4 shadow-xl text-white"
+        class="hidden bg-white border border-gray-200 rounded-2xl shadow-sm p-5 flex flex-col gap-3"
       >
-        <div class="flex items-center justify-between gap-2 mb-3">
-          <div class="flex items-center gap-2">
-            <span class="w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse"></span>
-            <h2 class="text-sm font-extrabold uppercase tracking-wider text-blue-300">
-              Caméra Active
-            </h2>
-          </div>
+        <div class="flex items-center justify-between gap-2">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border bg-blue-50 text-blue-700 border-blue-200">
+            <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+            <span>Caméra Active</span>
+          </span>
           <button
             id="switch-to-usb-btn"
             type="button"
-            class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-bold text-slate-200 transition touch-manipulation"
+            class="px-3 py-1.5 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 text-xs font-semibold text-slate-700 transition-colors touch-manipulation"
           >
             Mode Douchette USB
           </button>
         </div>
 
-        <div id="reader" class="w-full rounded-xl overflow-hidden"></div>
-        <p id="camera-error" class="hidden mt-3 p-3 rounded-xl bg-red-950/70 border border-red-500/40 text-sm font-semibold text-red-300"></p>
+        <div id="reader" class="w-full"></div>
+        <p id="camera-error" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 text-sm font-semibold text-red-700"></p>
       </section>
 
     </div>
   </main>
 
-  <footer class="w-full max-w-xl mx-auto px-4 py-3 text-center text-xs text-slate-400">
-    SARL TRADIFOOT WMS • 100% Hors-ligne après chargement Excel
+  <footer class="w-full max-w-xl mx-auto px-4 py-3 text-center text-xs text-slate-500">
+    SARL TRADIFOOT WMS • Fonctionnement local hors-ligne
   </footer>
 
   <script>
@@ -448,7 +539,6 @@
 
         // Heuristic fallback if headers are missing or non-standard
         if (barcodeCol === -1 && headers.length >= 2) {
-          // Sample first 15 rows to locate the column with mostly 8-14 digit numeric barcodes
           let bestCol = range.s.c;
           let bestScore = -1;
           const sampleEnd = Math.min(range.e.r, headerRow + 15);
@@ -538,7 +628,6 @@
           if (!existing) {
             map.set(barcode, { sku, zone });
           } else {
-            // Prefer an entry that actually carries a non-empty valid zone
             const existingHasZone = existing.zone && existing.zone.toUpperCase() !== "NO ZONE";
             const currentHasZone = zone && zone.toUpperCase() !== "NO ZONE";
             if (!existingHasZone && currentHasZone) {
@@ -659,9 +748,13 @@
       const loadedFileStatsEl = document.getElementById("loaded-file-stats");
       const changeFileBtn = document.getElementById("change-file-btn");
 
-      const modeBadge = document.getElementById("mode-badge");
-      const modeDot = document.getElementById("mode-dot");
-      const modeLabel = document.getElementById("mode-label");
+      const headerStatusBadge = document.getElementById("header-status-badge");
+      const headerStatusDot = document.getElementById("header-status-dot");
+      const headerStatusLabel = document.getElementById("header-status-label");
+
+      const scannerStatusBadge = document.getElementById("scanner-status-badge");
+      const scannerStatusDot = document.getElementById("scanner-status-dot");
+      const scannerStatusLabel = document.getElementById("scanner-status-label");
       const focusIndicator = document.getElementById("focus-indicator");
 
       const soundToggleBtn = document.getElementById("sound-toggle-btn");
@@ -729,26 +822,40 @@
       }
 
       function updateModeUI() {
-        modeBadge.classList.toggle("hidden", !state.isLoaded);
-        if (!state.isLoaded) return;
+        if (!state.isLoaded) {
+          headerStatusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-semibold border bg-yellow-50 text-yellow-700 border-yellow-200";
+          headerStatusDot.className = "w-2 h-2 rounded-full bg-yellow-500";
+          headerStatusLabel.textContent = "En attente...";
+          return;
+        }
 
         if (state.isCameraActive) {
-          modeBadge.className = "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border border-blue-500/40 bg-blue-500/15 text-blue-300";
-          modeDot.className = "w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse";
-          modeLabel.textContent = "Caméra Active";
-          focusIndicator.textContent = "Cliquer pour Douchette";
-          focusIndicator.className = "text-xs font-bold text-amber-600";
+          headerStatusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-semibold border bg-blue-50 text-blue-700 border-blue-200";
+          headerStatusDot.className = "w-2 h-2 rounded-full bg-blue-600 animate-pulse";
+          headerStatusLabel.textContent = "Caméra Active";
 
-          cameraToggleBtn.className = "w-full min-h-[56px] py-3.5 px-5 rounded-2xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white font-black text-lg tracking-wide shadow-lg border-2 border-slate-600 flex items-center justify-center gap-3 transition touch-manipulation";
+          scannerStatusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border bg-blue-50 text-blue-700 border-blue-200";
+          scannerStatusDot.className = "w-2 h-2 rounded-full bg-blue-600 animate-pulse";
+          scannerStatusLabel.textContent = "Scan Caméra";
+
+          focusIndicator.textContent = "Cliquer pour Douchette";
+          focusIndicator.className = "text-xs font-semibold text-amber-600";
+
+          cameraToggleBtn.className = "w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2.5 transition-colors touch-manipulation";
           cameraBtnLabel.textContent = "Fermer la Caméra";
         } else {
-          modeBadge.className = "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border border-green-500/40 bg-green-500/15 text-green-400";
-          modeDot.className = "w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse";
-          modeLabel.textContent = "Douchette USB";
-          focusIndicator.textContent = "Focus auto actif";
-          focusIndicator.className = "text-xs font-bold text-green-600";
+          headerStatusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200";
+          headerStatusDot.className = "w-2 h-2 rounded-full bg-emerald-500";
+          headerStatusLabel.textContent = "Prêt à scanner";
 
-          cameraToggleBtn.className = "w-full min-h-[56px] py-3.5 px-5 rounded-2xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-black text-lg tracking-wide shadow-lg border-2 border-blue-400/30 flex items-center justify-center gap-3 transition touch-manipulation";
+          scannerStatusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200";
+          scannerStatusDot.className = "w-2 h-2 rounded-full bg-emerald-500";
+          scannerStatusLabel.textContent = "Douchette USB prête";
+
+          focusIndicator.textContent = "Focus auto actif";
+          focusIndicator.className = "text-xs font-semibold text-emerald-600";
+
+          cameraToggleBtn.className = "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2.5 transition-colors touch-manipulation";
           cameraBtnLabel.textContent = "Ouvrir la Caméra";
         }
       }
@@ -768,7 +875,7 @@
         countdownTrack.classList.add("hidden");
         countdownBar.classList.remove("animate-countdown");
 
-        resultPanel.className = "relative overflow-hidden rounded-3xl border-4 border-slate-200 bg-white p-6 sm:p-8 text-center shadow-2xl transition-all";
+        resultPanel.className = "relative overflow-hidden bg-gray-50 border border-gray-200 rounded-xl p-4 transition-all";
         stateIdle.classList.remove("hidden");
       }
 
@@ -853,8 +960,8 @@
         const result = lookupBarcode(code);
 
         if (!result || !result.entry) {
-          resultPanel.className = "relative overflow-hidden rounded-3xl border-4 border-red-600 bg-red-50 p-6 sm:p-8 text-center shadow-2xl transition-all";
-          errorBarcodeEl.textContent = `Code-barres : ${code}`;
+          resultPanel.className = "relative overflow-hidden bg-gray-50 border border-gray-200 rounded-xl p-4 transition-all";
+          errorBarcodeEl.textContent = code;
           stateError.classList.remove("hidden");
           countdownBar.className = "h-full bg-red-600";
           AudioFeedback.playError();
@@ -864,19 +971,17 @@
           const hasValidZone = cleanZone.length > 0 && cleanZone.toUpperCase() !== "NO ZONE";
 
           if (!hasValidZone) {
-            // Barcode & SKU exist, but Zone cell is empty or marked NO ZONE
-            resultPanel.className = "relative overflow-hidden rounded-3xl border-4 border-red-600 bg-red-50 p-6 sm:p-8 text-center shadow-2xl transition-all";
+            resultPanel.className = "relative overflow-hidden bg-gray-50 border border-gray-200 rounded-xl p-4 transition-all";
             noZoneSkuEl.textContent = sku || "SKU non renseigné";
-            noZoneBarcodeEl.textContent = `Code-barres : ${code}`;
+            noZoneBarcodeEl.textContent = code;
             stateNoZone.classList.remove("hidden");
             countdownBar.className = "h-full bg-red-600";
             AudioFeedback.playError();
           } else {
-            // Found with valid Zone
-            resultPanel.className = "relative overflow-hidden rounded-3xl border-4 border-green-600 bg-white p-6 sm:p-8 text-center shadow-2xl transition-all";
+            resultPanel.className = "relative overflow-hidden bg-gray-50 border border-gray-200 rounded-xl p-4 transition-all";
             resultZoneEl.textContent = cleanZone;
             resultSkuEl.textContent = sku || "SKU non renseigné";
-            resultBarcodeEl.textContent = `Code-barres : ${code}`;
+            resultBarcodeEl.textContent = code;
             stateSuccess.classList.remove("hidden");
             countdownBar.className = "h-full bg-green-600";
             AudioFeedback.playSuccess();
@@ -903,7 +1008,6 @@
         uploadError.textContent = "";
         uploadLoading.classList.remove("hidden");
 
-        // Yield one frame so the spinner renders before synchronous XLSX.read on large files
         setTimeout(async () => {
           try {
             const buffer = await file.arrayBuffer();
@@ -915,7 +1019,7 @@
             state.lastScanAt = 0;
 
             loadedFileNameEl.textContent = `${file.name} (${parsed.sheetName})`;
-            loadedFileStatsEl.textContent = `${parsed.uniqueBarcodes.toLocaleString("fr-FR")} codes-barres • Colonnes : ${parsed.labels.barcode} / ${parsed.labels.sku} / ${parsed.labels.zone}`;
+            loadedFileStatsEl.textContent = `${parsed.uniqueBarcodes.toLocaleString("fr-FR")} codes-barres • ${parsed.labels.barcode} / ${parsed.labels.sku} / ${parsed.labels.zone}`;
 
             uploadSection.classList.add("hidden");
             scannerSection.classList.remove("hidden");
@@ -940,16 +1044,16 @@
 
       dropZone.addEventListener("dragover", (e) => {
         e.preventDefault();
-        dropZone.classList.add("border-green-600", "bg-green-50");
+        dropZone.classList.add("border-blue-500", "bg-blue-50/40");
       });
 
       dropZone.addEventListener("dragleave", () => {
-        dropZone.classList.remove("border-green-600", "bg-green-50");
+        dropZone.classList.remove("border-blue-500", "bg-blue-50/40");
       });
 
       dropZone.addEventListener("drop", (e) => {
         e.preventDefault();
-        dropZone.classList.remove("border-green-600", "bg-green-50");
+        dropZone.classList.remove("border-blue-500", "bg-blue-50/40");
         const file = e.dataTransfer?.files?.[0];
         if (file) processUploadedFile(file);
       });
@@ -1191,3 +1295,4 @@
   </script>
 </body>
 </html>
+```
