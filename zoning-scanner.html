@@ -128,28 +128,11 @@
         </h1>
       </header>
 
-      <!-- Ghost Input for Physical USB Douchette (Invisible, Auto-Focused) -->
-      <form id="manual-scan-form" autocomplete="off" class="contents">
-        <input
-          id="barcode-input"
-          name="barcode"
-          type="text"
-          inputmode="none"
-          autocomplete="off"
-          autocorrect="off"
-          autocapitalize="off"
-          spellcheck="false"
-          disabled
-          aria-label="Entrée douchette USB"
-          class="absolute opacity-0 w-0 h-0 p-0 m-0 border-0 overflow-hidden pointer-events-none"
-        />
-      </form>
-
       <!-- Ultra-Clean Scan Result Display -->
       <div
         id="result-panel"
         aria-live="polite"
-        class="relative py-10 min-h-[180px] flex flex-col items-center justify-center text-center"
+        class="relative py-8 sm:py-10 min-h-[168px] flex flex-col items-center justify-center text-center"
       >
         <!-- Idle State -->
         <div id="state-idle" class="flex items-center justify-center text-slate-200">
@@ -181,12 +164,42 @@
         </div>
       </div>
 
+      <!-- Minimalist Pill Input (SKU Typing + Auto-Focused USB Douchette) -->
+      <form id="manual-scan-form" autocomplete="off" class="relative mt-2">
+        <input
+          id="barcode-input"
+          name="barcode"
+          type="text"
+          inputmode="text"
+          enterkeyhint="search"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
+          disabled
+          placeholder="SKU ou code-barres..."
+          aria-label="Saisir SKU ou scanner code-barres"
+          class="w-full h-11 bg-slate-50 border border-gray-200 focus:border-blue-500 focus:bg-white focus:outline-none rounded-full pl-5 pr-12 text-center text-sm font-medium text-slate-800 placeholder-slate-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        />
+        <button
+          id="submit-scan-btn"
+          type="submit"
+          disabled
+          aria-label="Rechercher SKU"
+          class="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-200/80 hover:bg-blue-600 text-slate-600 hover:text-white flex items-center justify-center transition-colors touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-200/80 disabled:hover:text-slate-600"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </button>
+      </form>
+
       <!-- Refined Pill-Shaped Camera Button -->
       <button
         id="camera-toggle-btn"
         type="button"
         disabled
-        class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-full flex items-center justify-center gap-2.5 transition-colors touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
+        class="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-full flex items-center justify-center gap-2.5 transition-colors touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h2l1.5-2h7L17 7h2a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -522,6 +535,7 @@
       const brandFallback = document.getElementById("brand-fallback");
       const dbStatusEl = document.getElementById("db-status");
       const barcodeInput = document.getElementById("barcode-input");
+      const submitScanBtn = document.getElementById("submit-scan-btn");
       const manualScanForm = document.getElementById("manual-scan-form");
       const cameraToggleBtn = document.getElementById("camera-toggle-btn");
       const cameraBtnLabel = document.getElementById("camera-btn-label");
@@ -560,11 +574,16 @@
 
       /**
        * =========================================================================
-       * 4. MICRO-STATUS DOTS & GHOST FOCUS CONTROL
+       * 4. MICRO-STATUS DOTS & HYBRID FOCUS CONTROL
        * =========================================================================
        */
+      function isDesktopPointer() {
+        return typeof window.matchMedia !== "function" || window.matchMedia("(pointer: fine)").matches;
+      }
+
       function setInputsDisabled(disabled) {
         barcodeInput.disabled = disabled;
+        submitScanBtn.disabled = disabled;
         cameraToggleBtn.disabled = disabled;
       }
 
@@ -613,8 +632,9 @@
         dbStatusEl.appendChild(retryDot);
       }
 
-      function focusScannerInput() {
+      function focusScannerInput(force = false) {
         if (!state.isLoaded || state.isCameraActive) return;
+        if (!force && !isDesktopPointer()) return;
         requestAnimationFrame(() => {
           if (state.isLoaded && !state.isCameraActive && document.activeElement !== barcodeInput) {
             barcodeInput.focus({ preventScroll: true });
@@ -624,10 +644,10 @@
 
       function updateCameraButtonUI() {
         if (state.isCameraActive) {
-          cameraToggleBtn.className = "mt-4 w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 px-6 rounded-full flex items-center justify-center gap-2.5 transition-colors touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed";
+          cameraToggleBtn.className = "mt-3 w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 px-6 rounded-full flex items-center justify-center gap-2.5 transition-colors touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed";
           cameraBtnLabel.textContent = "Fermer";
         } else {
-          cameraToggleBtn.className = "mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-full flex items-center justify-center gap-2.5 transition-colors touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600";
+          cameraToggleBtn.className = "mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-full flex items-center justify-center gap-2.5 transition-colors touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600";
           cameraBtnLabel.textContent = "Scanner";
         }
       }
@@ -758,9 +778,11 @@
         const cooldown = source === "camera" ? CAMERA_DUPLICATE_COOLDOWN_MS : USB_DUPLICATE_COOLDOWN_MS;
 
         if (code === state.lastScanCode && now - state.lastScanAt < cooldown) {
-          if (source === "usb") {
+          if (source !== "camera") {
             barcodeInput.value = "";
-            focusScannerInput();
+            if (source === "usb" || isDesktopPointer()) {
+              focusScannerInput();
+            }
           }
           return;
         }
@@ -770,7 +792,7 @@
         state.rapidBurstCount = 0;
         state.lastKeyTime = 0;
 
-        if (source === "usb") {
+        if (source !== "camera") {
           barcodeInput.value = "";
         }
 
@@ -810,13 +832,17 @@
         scheduleAutoClear();
 
         if (!state.isCameraActive) {
-          focusScannerInput();
+          if (source === "manual" && !isDesktopPointer()) {
+            barcodeInput.blur();
+          } else {
+            focusScannerInput();
+          }
         }
       }
 
       /**
        * =========================================================================
-       * 7. HYBRID INPUT LISTENERS (Ghost USB Douchette + Camera)
+       * 7. HYBRID INPUT LISTENERS (USB Douchette + Manual SKU + Camera)
        * =========================================================================
        */
       const debouncedUsbScannerSubmit = debounce((val) => {
@@ -830,20 +856,27 @@
         AudioFeedback.unlock();
         if (!state.isLoaded) return;
 
+        if (e.isComposing || e.key === "Unidentified") {
+          state.rapidBurstCount = 0;
+          state.lastKeyTime = 0;
+          return;
+        }
+
         const now = performance.now();
-        const delta = now - state.lastKeyTime;
+        const delta = state.lastKeyTime > 0 ? now - state.lastKeyTime : 0;
         state.lastKeyTime = now;
 
-        if (delta > 0 && delta < 55) {
+        if (delta > 0 && delta < 35) {
           state.rapidBurstCount += 1;
-        } else if (delta >= 120) {
+        } else if (delta >= 80) {
           state.rapidBurstCount = 0;
         }
 
         if (e.key === "Enter") {
           e.preventDefault();
           debouncedUsbScannerSubmit.cancel();
-          handleBarcodeScan(barcodeInput.value, "usb");
+          const source = state.rapidBurstCount >= 5 ? "usb" : "manual";
+          handleBarcodeScan(barcodeInput.value, source);
         }
       });
 
@@ -856,18 +889,12 @@
           return;
         }
 
-        if (state.rapidBurstCount >= 3 || state.lastKeyTime === 0) {
+        // Only auto-submit when sustained rapid HID scanner keystrokes occur (< 35ms each)
+        if (state.rapidBurstCount >= 6) {
           debouncedUsbScannerSubmit(val);
+        } else {
+          debouncedUsbScannerSubmit.cancel();
         }
-      });
-
-      barcodeInput.addEventListener("paste", () => {
-        if (!state.isLoaded) return;
-        requestAnimationFrame(() => {
-          if (barcodeInput.value.trim().length >= 4) {
-            debouncedUsbScannerSubmit(barcodeInput.value);
-          }
-        });
       });
 
       manualScanForm.addEventListener("submit", async (e) => {
@@ -879,7 +906,7 @@
         if (state.isCameraActive) {
           await stopCamera();
         }
-        handleBarcodeScan(barcodeInput.value, "usb");
+        handleBarcodeScan(barcodeInput.value, "manual");
       });
 
       barcodeInput.addEventListener("focus", () => {
@@ -996,7 +1023,7 @@
       document.addEventListener("click", (e) => {
         AudioFeedback.unlock();
         if (!state.isLoaded || state.isCameraActive) return;
-        const interactive = e.target.closest("button, select, a, #camera-section");
+        const interactive = e.target.closest("button, input, select, a, #camera-section");
         if (!interactive) focusScannerInput();
       });
 
