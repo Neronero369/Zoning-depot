@@ -322,6 +322,28 @@
           </button>
         </div>
 
+        <!-- Smart Memory Camera Selector (Replaces Main Action Area) -->
+        <div id="camera-picker" class="hidden w-full bg-slate-50/80 border border-slate-200/80 rounded-3xl p-4 flex flex-col items-center text-center shadow-inner">
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5">Sélectionner la caméra</p>
+          <div class="relative w-full">
+            <select
+              id="camera-select"
+              aria-label="Choisir la caméra"
+              class="w-full px-5 py-3.5 pr-10 bg-slate-100/50 border-0 rounded-2xl text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none mb-4 appearance-none font-medium shadow-inner transition-all"
+            ></select>
+            <svg xmlns="http://www.w3.org/2000/svg" class="pointer-events-none w-4 h-4 text-slate-500 absolute right-4 top-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+          <button
+            id="start-selected-camera-btn"
+            type="button"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 px-6 rounded-2xl shadow-md hover:shadow-lg transform active:scale-[0.98] transition-all flex items-center justify-center gap-2 touch-manipulation"
+          >
+            Démarrer la caméra
+          </button>
+        </div>
+
         <!-- Auto-Clear Countdown Hairline -->
         <div id="countdown-track" class="hidden absolute bottom-0 left-4 right-4 h-0.5 bg-slate-100 rounded-full overflow-hidden">
           <div id="countdown-bar" class="h-full bg-green-500"></div>
@@ -376,7 +398,19 @@
       aria-label="Caméra"
       class="hidden w-full max-w-md bg-white/80 backdrop-blur-2xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[2rem] p-3 overflow-hidden relative z-10"
     >
-      <div id="reader" class="w-full"></div>
+      <div class="relative w-full overflow-hidden rounded-xl">
+        <div id="reader" class="w-full"></div>
+        <button
+          id="change-camera-btn"
+          type="button"
+          class="hidden absolute bottom-2.5 right-2.5 z-20 bg-slate-900/70 hover:bg-slate-900/90 backdrop-blur-md text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/20 shadow-md flex items-center gap-1.5 transition-all active:scale-95 touch-manipulation"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span>Changer de caméra</span>
+        </button>
+      </div>
       <p id="camera-error" class="hidden mt-2 text-center text-xs font-medium text-red-600"></p>
     </section>
 
@@ -518,6 +552,10 @@
       const cameraSection = document.getElementById("camera-section");
       const cameraErrorEl = document.getElementById("camera-error");
       const readerEl = document.getElementById("reader");
+      const cameraPickerEl = document.getElementById("camera-picker");
+      const cameraSelectEl = document.getElementById("camera-select");
+      const startSelectedCameraBtn = document.getElementById("start-selected-camera-btn");
+      const changeCameraBtn = document.getElementById("change-camera-btn");
 
       const resultPanel = document.getElementById("result-panel");
       const stateIdle = document.getElementById("state-idle");
@@ -558,6 +596,7 @@
         unknownBarcode: "",
         isBusy: false,
         isCameraActive: false,
+        isCameraPickerOpen: false,
         isCameraBusy: false,
         html5QrCode: null,
         autoClearTimer: null,
@@ -566,6 +605,8 @@
         lastKeyTime: 0,
         rapidBurstCount: 0
       };
+
+      const CAMERA_STORAGE_KEY = "tradifoot_cam";
 
       const AUTO_CLEAR_MS = 3000;
       const USB_DEBOUNCE_MS = 160;
@@ -610,7 +651,7 @@
       }
 
       function focusScannerInput(force = false) {
-        if (state.isCameraActive) return;
+        if (state.isCameraActive || state.isCameraPickerOpen) return;
         if (state.mode !== MODE.LOOKUP) return;
         if (!force && !isDesktopPointer()) return;
         if (document.activeElement !== barcodeInput) {
@@ -619,6 +660,7 @@
         requestAnimationFrame(() => {
           if (
             !state.isCameraActive &&
+            !state.isCameraPickerOpen &&
             state.mode === MODE.LOOKUP &&
             document.activeElement !== barcodeInput
           ) {
@@ -649,7 +691,7 @@
       }
 
       function updateCameraButtonUI() {
-        if (state.isCameraActive) {
+        if (state.isCameraActive || state.isCameraPickerOpen) {
           cameraToggleBtn.className = "mt-2.5 w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3.5 px-6 rounded-2xl shadow-md hover:shadow-lg transform active:scale-[0.98] transition-all flex items-center justify-center gap-2 touch-manipulation";
           cameraBtnLabel.textContent = "Fermer";
         } else {
@@ -666,12 +708,16 @@
       }
 
       function hideAllResultStates() {
+        const wasPickerOpen = state.isCameraPickerOpen;
         stateIdle.classList.add("hidden");
         stateSuccess.classList.add("hidden");
         stateRelocate.classList.add("hidden");
         stateRelocated.classList.add("hidden");
         stateCreate.classList.add("hidden");
         stateError.classList.add("hidden");
+        cameraPickerEl.classList.add("hidden");
+        state.isCameraPickerOpen = false;
+        if (wasPickerOpen) updateCameraButtonUI();
         addArticleBtn.classList.add("hidden");
         manualZoneInput.classList.remove("!ring-2", "!ring-red-500");
         relocateValidationError.classList.add("hidden");
@@ -697,7 +743,8 @@
         barcodeInput.placeholder = "SKU ou code-barres...";
         mainCard.className = "w-full max-w-md bg-white/80 backdrop-blur-2xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[2rem] p-5 flex flex-col relative z-10 transition-all duration-200";
         stateIdle.classList.remove("hidden");
-        if (!state.isCameraActive) {
+        updateCameraButtonUI();
+        if (!state.isCameraActive && !state.isCameraPickerOpen) {
           focusScannerInput(forceFocusScanner);
         }
       }
@@ -1387,8 +1434,101 @@
         });
       }
 
-      async function startCamera() {
-        if (state.isCameraActive || state.isCameraBusy) return;
+      function getSavedCameraId() {
+        try {
+          return localStorage.getItem(CAMERA_STORAGE_KEY) || "";
+        } catch (_) {
+          return "";
+        }
+      }
+
+      function setSavedCameraId(cameraId) {
+        try {
+          localStorage.setItem(CAMERA_STORAGE_KEY, cameraId);
+        } catch (_) {}
+      }
+
+      function clearSavedCameraId() {
+        try {
+          localStorage.removeItem(CAMERA_STORAGE_KEY);
+        } catch (_) {}
+      }
+
+      function pickPreferredCameraId(cameras) {
+        if (!Array.isArray(cameras) || cameras.length === 0) return "";
+        const mainRear = cameras.find((cam) => {
+          const label = String(cam.label || "").toLowerCase();
+          const isRear = /back|rear|environment|arrière|camera2 0/.test(label);
+          const isAux = /macro|ultra|wide|tele|depth|front|selfie|avant/.test(label);
+          return isRear && !isAux;
+        });
+        if (mainRear) return mainRear.id;
+        const anyRear = cameras.find((cam) => /back|rear|environment|arrière/i.test(cam.label || ""));
+        return (anyRear || cameras[0]).id;
+      }
+
+      async function openCameraSelector() {
+        if (state.isCameraBusy) return;
+        state.isCameraBusy = true;
+        cameraErrorEl.classList.add("hidden");
+        cameraErrorEl.textContent = "";
+
+        if (typeof Html5Qrcode === "undefined" || typeof Html5Qrcode.getCameras !== "function") {
+          cameraSection.classList.remove("hidden");
+          cameraErrorEl.textContent = "Caméra indisponible.";
+          cameraErrorEl.classList.remove("hidden");
+          state.isCameraBusy = false;
+          return;
+        }
+
+        try {
+          debouncedUsbScannerSubmit.cancel();
+          if (state.mode !== MODE.LOOKUP) {
+            resetToIdleState(false);
+          }
+          barcodeInput.blur();
+          manualZoneInput.blur();
+          newSkuInput.blur();
+          newZoneInput.blur();
+
+          const cameras = await Html5Qrcode.getCameras();
+          if (!Array.isArray(cameras) || cameras.length === 0) {
+            alert("Aucune caméra détectée sur cet appareil.");
+            resetToIdleState(false);
+            return;
+          }
+
+          cameraSelectEl.innerHTML = "";
+          cameras.forEach((cam, idx) => {
+            const opt = document.createElement("option");
+            opt.value = cam.id;
+            opt.textContent = cam.label || `Caméra ${idx + 1}`;
+            cameraSelectEl.appendChild(opt);
+          });
+          const preferredId = pickPreferredCameraId(cameras);
+          if (preferredId) {
+            cameraSelectEl.value = preferredId;
+          }
+
+          clearAutoResetTimer();
+          hideAllResultStates();
+          cameraSection.classList.add("hidden");
+          changeCameraBtn.classList.add("hidden");
+          state.isCameraPickerOpen = true;
+          cameraPickerEl.classList.remove("hidden");
+          updateCameraButtonUI();
+          triggerCardFlash();
+        } catch (err) {
+          console.error("Camera enumeration failed:", err);
+          alert("Erreur d'accès aux caméras. Veuillez vérifier les permissions.");
+          resetToIdleState(false);
+        } finally {
+          state.isCameraBusy = false;
+        }
+      }
+
+      async function startCameraWithId(cameraId, { fromSaved = false } = {}) {
+        if (!cameraId || state.isCameraActive || state.isCameraBusy) return;
         state.isCameraBusy = true;
         cameraErrorEl.classList.add("hidden");
         cameraErrorEl.textContent = "";
@@ -1410,8 +1550,16 @@
           manualZoneInput.blur();
           newSkuInput.blur();
           newZoneInput.blur();
+
+          if (state.isCameraPickerOpen) {
+            cameraPickerEl.classList.add("hidden");
+            state.isCameraPickerOpen = false;
+            stateIdle.classList.remove("hidden");
+          }
+
           state.isCameraActive = true;
           cameraSection.classList.remove("hidden");
+          changeCameraBtn.classList.remove("hidden");
           updateCameraButtonUI();
 
           const formatsToSupport = typeof Html5QrcodeSupportedFormats !== "undefined"
@@ -1442,7 +1590,7 @@
           state.html5QrCode = html5QrCode;
 
           await html5QrCode.start(
-            { facingMode: "environment" },
+            cameraId,
             config,
             (decodedText) => handleScan(decodedText, "camera"),
             () => {}
@@ -1451,17 +1599,35 @@
           cameraSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
         } catch (err) {
           console.error("Camera start failed:", err);
-          cameraErrorEl.textContent = "Erreur de caméra. Veuillez vérifier les permissions.";
-          cameraErrorEl.classList.remove("hidden");
+          const errName = String(err?.name || err?.message || "");
+          const isPermissionDenied = /NotAllowedError|Permission|SecurityError/i.test(errName);
           await stopCamera();
+
+          if (fromSaved && !isPermissionDenied) {
+            clearSavedCameraId();
+            state.isCameraBusy = false;
+            await openCameraSelector();
+            return;
+          }
+
           alert("Erreur de caméra. Veuillez vérifier les permissions.");
         } finally {
           state.isCameraBusy = false;
         }
       }
 
+      async function startCamera() {
+        if (state.isCameraActive || state.isCameraPickerOpen || state.isCameraBusy) return;
+        const savedId = getSavedCameraId();
+        if (savedId) {
+          await startCameraWithId(savedId, { fromSaved: true });
+        } else {
+          await openCameraSelector();
+        }
+      }
+
       async function stopCamera() {
-        if (state.isCameraBusy && !state.isCameraActive) return;
+        if (state.isCameraBusy && !state.isCameraActive && !state.isCameraPickerOpen) return;
         state.isCameraBusy = true;
         state.isCameraActive = false;
 
@@ -1483,7 +1649,13 @@
           stopDanglingVideoTracks();
         } finally {
           readerEl.innerHTML = "";
+          changeCameraBtn.classList.add("hidden");
           cameraSection.classList.add("hidden");
+          if (state.isCameraPickerOpen) {
+            cameraPickerEl.classList.add("hidden");
+            state.isCameraPickerOpen = false;
+            stateIdle.classList.remove("hidden");
+          }
           state.isCameraBusy = false;
           updateCameraButtonUI();
           focusScannerInput();
@@ -1493,11 +1665,28 @@
       cameraToggleBtn.addEventListener("click", () => {
         AudioFeedback.unlock();
         cameraToggleBtn.blur();
-        if (state.isCameraActive) {
+        if (state.isCameraActive || state.isCameraPickerOpen) {
           stopCamera();
         } else {
           startCamera();
         }
+      });
+
+      startSelectedCameraBtn.addEventListener("click", () => {
+        AudioFeedback.unlock();
+        startSelectedCameraBtn.blur();
+        const selectedId = cameraSelectEl.value;
+        if (!selectedId) return;
+        setSavedCameraId(selectedId);
+        startCameraWithId(selectedId, { fromSaved: false });
+      });
+
+      changeCameraBtn.addEventListener("click", async () => {
+        AudioFeedback.unlock();
+        changeCameraBtn.blur();
+        await stopCamera();
+        clearSavedCameraId();
+        await openCameraSelector();
       });
 
       /**
@@ -1651,7 +1840,7 @@
           alert(`Erreur lors de l'export Excel : ${err?.message || "Erreur inconnue"}`);
         } finally {
           isExporting = false;
-          if (state.mode === MODE.LOOKUP && !state.isCameraActive) {
+          if (state.mode === MODE.LOOKUP && !state.isCameraActive && !state.isCameraPickerOpen) {
             focusScannerInput();
           }
         }
@@ -1662,19 +1851,19 @@
 
       document.addEventListener("click", (e) => {
         AudioFeedback.unlock();
-        if (state.isCameraActive) return;
-        const interactive = e.target.closest("button, input, select, a, #camera-section");
+        if (state.isCameraActive || state.isCameraPickerOpen) return;
+        const interactive = e.target.closest("button, input, select, a, #camera-section, #camera-picker");
         if (!interactive) focusScannerInput();
       });
 
       window.addEventListener("focus", () => {
-        if (!state.isCameraActive) {
+        if (!state.isCameraActive && !state.isCameraPickerOpen) {
           focusScannerInput();
         }
       });
 
       window.addEventListener("pagehide", () => {
-        if (state.isCameraActive) stopCamera();
+        if (state.isCameraActive || state.isCameraPickerOpen) stopCamera();
       });
 
       window.addEventListener("DOMContentLoaded", () => {
