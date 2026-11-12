@@ -66,10 +66,12 @@
       color: #2563eb !important;
       text-decoration: underline !important;
     }
-    #reader__scan_region video {
+    #reader__scan_region video,
+    #reader video {
       border-radius: 0.5rem;
       object-fit: cover;
       max-height: 170px !important;
+      width: 100%;
     }
     @keyframes scanFlash {
       0% { transform: scale(0.99); }
@@ -557,7 +559,7 @@
         isBusy: false,
         isCameraActive: false,
         isCameraBusy: false,
-        html5QrcodeScanner: null,
+        html5QrCode: null,
         autoClearTimer: null,
         lastScanCode: "",
         lastScanAt: 0,
@@ -1391,7 +1393,7 @@
         cameraErrorEl.classList.add("hidden");
         cameraErrorEl.textContent = "";
 
-        if (typeof Html5QrcodeScanner === "undefined") {
+        if (typeof Html5Qrcode === "undefined") {
           cameraSection.classList.remove("hidden");
           cameraErrorEl.textContent = "Caméra indisponible.";
           cameraErrorEl.classList.remove("hidden");
@@ -1428,26 +1430,31 @@
 
           const config = {
             fps: 12,
-            rememberLastUsedCamera: true,
             qrbox: (viewfinderWidth, viewfinderHeight) => ({
               width: Math.max(50, Math.min(320, Math.floor(viewfinderWidth * 0.85))),
               height: Math.max(50, Math.min(160, Math.floor(viewfinderHeight * 0.55)))
-            }),
-            ...(formatsToSupport ? { formatsToSupport } : {})
+            })
           };
 
-          state.html5QrcodeScanner = new Html5QrcodeScanner("reader", config, /* verbose= */ false);
-          state.html5QrcodeScanner.render(
+          const html5QrCode = formatsToSupport
+            ? new Html5Qrcode("reader", { formatsToSupport, verbose: false })
+            : new Html5Qrcode("reader", false);
+          state.html5QrCode = html5QrCode;
+
+          await html5QrCode.start(
+            { facingMode: "environment" },
+            config,
             (decodedText) => handleScan(decodedText, "camera"),
             () => {}
           );
 
           cameraSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
         } catch (err) {
-          console.error("Erreur caméra:", err);
-          cameraErrorEl.textContent = "Permissions caméra ou HTTPS requis.";
+          console.error("Camera start failed:", err);
+          cameraErrorEl.textContent = "Erreur de caméra. Veuillez vérifier les permissions.";
           cameraErrorEl.classList.remove("hidden");
           await stopCamera();
+          alert("Erreur de caméra. Veuillez vérifier les permissions.");
         } finally {
           state.isCameraBusy = false;
         }
@@ -1459,9 +1466,19 @@
         state.isCameraActive = false;
 
         try {
-          if (state.html5QrcodeScanner) {
-            await state.html5QrcodeScanner.clear().catch(() => {});
-            state.html5QrcodeScanner = null;
+          if (state.html5QrCode) {
+            const scanner = state.html5QrCode;
+            state.html5QrCode = null;
+            try {
+              if (typeof scanner.stop === "function") {
+                await Promise.resolve(scanner.stop()).catch(() => {});
+              }
+            } catch (_) {}
+            try {
+              if (typeof scanner.clear === "function") {
+                await Promise.resolve(scanner.clear()).catch(() => {});
+              }
+            } catch (_) {}
           }
           stopDanglingVideoTracks();
         } finally {
