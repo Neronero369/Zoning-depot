@@ -192,6 +192,22 @@
         </svg>
       </button>
 
+      <!-- Network Survival Status Indicator (Online/Offline & Pending Queue) -->
+      <div
+        id="network-status"
+        class="hidden absolute top-4 left-16 flex items-center gap-1 p-1 pointer-events-none select-none"
+        title="État réseau / Mode Survie"
+        aria-live="polite"
+      >
+        <svg id="network-icon-offline" xmlns="http://www.w3.org/2000/svg" class="hidden w-4 h-4 text-red-500 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M18.364 18.364A4 4 0 0019 15a4 4 0 00-3.1-3.9 5.5 5.5 0 00-9.65-2.05M6.343 6.343A4.5 4.5 0 003 10.5c0 .73.174 1.419.483 2.029M6.5 19h9.5" />
+        </svg>
+        <svg id="network-icon-syncing" xmlns="http://www.w3.org/2000/svg" class="hidden w-4 h-4 text-blue-600 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 14.899A7 7 0 1115.71 8h1.79a4.5 4.5 0 012.5 8.242M12 12v9m0 0l-3-3m3 3l3-3" />
+        </svg>
+        <span id="network-queue-count" class="hidden px-1.5 py-0.5 text-[10px] font-bold leading-none rounded-full bg-slate-100 text-slate-700 border border-slate-200/80">0</span>
+      </div>
+
       <!-- Top-Right Stealth History Button & Micro-Status Indicator -->
       <button
         id="history-btn"
@@ -675,6 +691,10 @@
       const voiceToggleBtn = document.getElementById("voice-toggle-btn");
       const voiceIconMuted = document.getElementById("voice-icon-muted");
       const voiceIconActive = document.getElementById("voice-icon-active");
+      const networkStatusEl = document.getElementById("network-status");
+      const networkIconOffline = document.getElementById("network-icon-offline");
+      const networkIconSyncing = document.getElementById("network-icon-syncing");
+      const networkQueueCountEl = document.getElementById("network-queue-count");
       const historyBtn = document.getElementById("history-btn");
       const historyModal = document.getElementById("history-modal");
       const closeHistoryBtn = document.getElementById("close-history-btn");
@@ -773,6 +793,130 @@
         }
       }
       window.registerStreak = registerStreak;
+
+      const OFFLINE_QUEUE_STORAGE_KEY = "tradifoot_offline_queue";
+      let offlineQueue = [];
+      try {
+        offlineQueue = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_STORAGE_KEY)) || [];
+        if (!Array.isArray(offlineQueue)) offlineQueue = [];
+      } catch {
+        offlineQueue = [];
+      }
+      let isSyncingQueue = false;
+
+      function updateNetworkUI() {
+        const isOnline = typeof navigator === "undefined" || navigator.onLine !== false;
+        const count = offlineQueue.length;
+
+        if (!networkStatusEl) return;
+
+        if (isOnline && count === 0) {
+          networkStatusEl.classList.add("hidden");
+          if (networkIconOffline) networkIconOffline.classList.add("hidden");
+          if (networkIconSyncing) networkIconSyncing.classList.add("hidden");
+          if (networkQueueCountEl) networkQueueCountEl.classList.add("hidden");
+          return;
+        }
+
+        networkStatusEl.classList.remove("hidden");
+
+        if (!isOnline) {
+          if (networkIconOffline) networkIconOffline.classList.remove("hidden");
+          if (networkIconSyncing) networkIconSyncing.classList.add("hidden");
+          if (networkQueueCountEl) {
+            if (count > 0) {
+              networkQueueCountEl.textContent = String(count);
+              networkQueueCountEl.className = "px-1.5 py-0.5 text-[10px] font-bold leading-none rounded-full bg-red-100 text-red-700 border border-red-200";
+              networkQueueCountEl.classList.remove("hidden");
+            } else {
+              networkQueueCountEl.classList.add("hidden");
+            }
+          }
+          return;
+        }
+
+        // Online with pending items to sync
+        if (networkIconOffline) networkIconOffline.classList.add("hidden");
+        if (networkIconSyncing) networkIconSyncing.classList.remove("hidden");
+        if (networkQueueCountEl) {
+          networkQueueCountEl.textContent = String(count);
+          networkQueueCountEl.className = "px-1.5 py-0.5 text-[10px] font-bold leading-none rounded-full bg-blue-100 text-blue-700 border border-blue-200";
+          networkQueueCountEl.classList.remove("hidden");
+        }
+      }
+
+      function saveQueue() {
+        try {
+          localStorage.setItem(OFFLINE_QUEUE_STORAGE_KEY, JSON.stringify(offlineQueue));
+        } catch {
+          // Ignore storage quota or private-mode restrictions
+        }
+        updateNetworkUI();
+      }
+
+      async function handleOnline() {
+        updateNetworkUI();
+
+        const isOnline = typeof navigator === "undefined" || navigator.onLine !== false;
+        if (!isOnline || isSyncingQueue || offlineQueue.length === 0 || !supabaseClient) {
+          return;
+        }
+
+        isSyncingQueue = true;
+        renderStatusBusy();
+        updateNetworkUI();
+
+        const queueSnapshot = offlineQueue.slice();
+
+        try {
+          const results = await Promise.all(
+            queueSnapshot.map(async (item) => {
+              const payload = {
+                barcode: item.barcode,
+                zone: item.zone,
+                last_updated_at: item.timestamp || new Date().toISOString()
+              };
+              if (item.sku) {
+                payload.sku = item.sku;
+              }
+              try {
+                const { error } = await supabaseClient
+                  .from("warehouse_zoning")
+                  .upsert(payload, { onConflict: "barcode" });
+                return { item, error };
+              } catch (err) {
+                return { item, error: err };
+              }
+            })
+          );
+
+          const failedEntries = results.filter((r) => r.error);
+          const remainingAddedWhileSyncing = offlineQueue.slice(queueSnapshot.length);
+          offlineQueue = failedEntries.map((r) => r.item).concat(remainingAddedWhileSyncing);
+          saveQueue();
+
+          if (failedEntries.length === 0) {
+            renderStatusReady();
+            AudioFeedback.playSuccess();
+            speakText("Synchronisation terminée");
+            triggerHaptic("success");
+          } else {
+            const firstMsg = failedEntries[0].error?.message || "Erreur de synchronisation";
+            renderStatusError(firstMsg);
+          }
+        } catch (err) {
+          console.error("Erreur auto-sync Mode Survie:", err);
+          renderStatusError(err?.message || "Erreur de synchronisation");
+        } finally {
+          isSyncingQueue = false;
+          updateNetworkUI();
+        }
+      }
+
+      window.saveQueue = saveQueue;
+      window.updateNetworkUI = updateNetworkUI;
+      window.handleOnline = handleOnline;
+      window.getOfflineQueue = () => offlineQueue.slice();
 
       const CAMERA_STORAGE_KEY = "tradifoot_cam";
 
@@ -1063,6 +1207,25 @@
         const cleanCode = sanitizeBarcode(scannedCode);
         if (!cleanCode) return;
 
+        if (typeof navigator !== "undefined" && navigator.onLine === false) {
+          clearAutoResetTimer();
+          hideAllResultStates();
+          mainCard.className = "w-full max-w-md bg-white/80 backdrop-blur-2xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[2rem] p-5 flex flex-col relative z-10 transition-all duration-200";
+          state.matchedBy = "barcode";
+          state.activeBarcode = cleanCode;
+          state.activeSku = "HORS-LIGNE";
+          state.activeZone = "HORS-LIGNE";
+          resultZoneEl.textContent = "HORS-LIGNE";
+          resultSkuEl.textContent = "HORS-LIGNE";
+          resultSkuEl.classList.remove("hidden");
+          updateNetworkUI();
+          enterRelocationMode();
+          AudioFeedback.playSuccess();
+          triggerHaptic("success");
+          speakText("Hors ligne");
+          return;
+        }
+
         if (!supabaseClient) {
           hideAllResultStates();
           errorTitleEl.textContent = "ERREUR SDK";
@@ -1170,7 +1333,8 @@
       async function handleState2Relocate() {
         const cleanActiveBarcode = sanitizeBarcode(state.activeBarcode);
         const cleanActiveSku = String(state.activeSku ?? "").replace(/[\r\n]+/g, "").trim().toUpperCase();
-        if (!supabaseClient || (!cleanActiveBarcode && !cleanActiveSku)) {
+        const isOffline = typeof navigator !== "undefined" && navigator.onLine === false;
+        if ((!isOffline && !supabaseClient) || (!cleanActiveBarcode && !cleanActiveSku)) {
           resetToIdleState(true);
           return;
         }
@@ -1196,6 +1360,55 @@
         renderStatusBusy();
 
         try {
+          if (typeof navigator !== "undefined" && navigator.onLine === false) {
+            const offlineBarcode = cleanActiveBarcode || cleanActiveSku;
+            const historySku = state.activeSku || cleanActiveBarcode;
+            const previousZoneValue = String(state.activeZone ?? "").trim() || "HORS-LIGNE";
+
+            offlineQueue.push({
+              barcode: offlineBarcode,
+              zone: newZoneValue,
+              timestamp: new Date().toISOString()
+            });
+            saveQueue();
+
+            addToScanHistory({
+              action: "RELOCATE",
+              matchedBy: state.matchedBy,
+              barcode: offlineBarcode,
+              sku: historySku,
+              oldZone: previousZoneValue,
+              newZone: newZoneValue,
+              undone: false
+            });
+
+            state.mode = MODE.LOOKUP;
+            state.matchedBy = "barcode";
+            state.activeBarcode = "";
+            state.activeSku = "";
+            state.activeZone = "";
+            state.lastScanCode = "";
+            state.lastScanAt = 0;
+            clearAllVisibleInputs();
+            barcodeInput.placeholder = "SKU ou code-barres...";
+
+            hideAllResultStates();
+            mainCard.className = "w-full max-w-md bg-white/80 backdrop-blur-2xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[2rem] p-5 flex flex-col relative z-10 transition-all duration-200";
+            relocatedMessageEl.textContent = `Sauvegardé hors-ligne → ${newZoneValue}`;
+            stateRelocated.classList.remove("hidden");
+            countdownBar.className = "h-full bg-green-500";
+
+            AudioFeedback.playSuccess();
+            triggerHaptic("success");
+            speakText("Sauvegardé hors-ligne");
+            registerStreak();
+            triggerScreenGreenFlash();
+            triggerCardFlash();
+            focusScannerInput(true);
+            scheduleAutoClear();
+            return;
+          }
+
           const payload = {
             zone: newZoneValue,
             last_updated_at: new Date().toISOString()
@@ -1306,7 +1519,8 @@
 
       async function handleState3Create() {
         const cleanUnknownBarcode = sanitizeBarcode(state.unknownBarcode);
-        if (!supabaseClient || !cleanUnknownBarcode) {
+        const isOffline = typeof navigator !== "undefined" && navigator.onLine === false;
+        if ((!isOffline && !supabaseClient) || !cleanUnknownBarcode) {
           resetToIdleState(true);
           return;
         }
@@ -1346,6 +1560,50 @@
         renderStatusBusy();
 
         try {
+          if (typeof navigator !== "undefined" && navigator.onLine === false) {
+            offlineQueue.push({
+              barcode: cleanUnknownBarcode,
+              sku: skuInputValue,
+              zone: newZoneValue,
+              timestamp: new Date().toISOString()
+            });
+            saveQueue();
+
+            addToScanHistory({
+              action: "CREATE",
+              barcode: cleanUnknownBarcode,
+              sku: skuInputValue,
+              newZone: newZoneValue
+            });
+
+            state.mode = MODE.LOOKUP;
+            state.matchedBy = "barcode";
+            state.activeBarcode = "";
+            state.activeSku = "";
+            state.activeZone = "";
+            state.unknownBarcode = "";
+            state.lastScanCode = "";
+            state.lastScanAt = 0;
+            clearAllVisibleInputs();
+            barcodeInput.placeholder = "SKU ou code-barres...";
+
+            hideAllResultStates();
+            mainCard.className = "w-full max-w-md bg-white/80 backdrop-blur-2xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[2rem] p-5 flex flex-col relative z-10 transition-all duration-200";
+            relocatedMessageEl.textContent = `Sauvegardé hors-ligne → ${newZoneValue}`;
+            stateRelocated.classList.remove("hidden");
+            countdownBar.className = "h-full bg-green-500";
+
+            AudioFeedback.playSuccess();
+            triggerHaptic("success");
+            speakText("Sauvegardé hors-ligne");
+            registerStreak();
+            triggerScreenGreenFlash();
+            triggerCardFlash();
+            focusScannerInput(true);
+            scheduleAutoClear();
+            return;
+          }
+
           const { error } = await supabaseClient
             .from("warehouse_zoning")
             .insert({
@@ -2337,6 +2595,9 @@
         }
       });
 
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", updateNetworkUI);
+
       window.addEventListener("pagehide", () => {
         if (state.isCameraActive || state.isCameraPickerOpen) stopCamera();
       });
@@ -2346,8 +2607,12 @@
           brandLogo.classList.add("hidden");
           brandFallback.classList.remove("hidden");
         }
+        updateNetworkUI();
         renderStatusReady();
         focusScannerInput();
+        if (typeof navigator === "undefined" || navigator.onLine !== false) {
+          if (offlineQueue.length > 0) handleOnline();
+        }
       });
     })();
   </script>
