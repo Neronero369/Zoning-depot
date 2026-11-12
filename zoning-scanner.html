@@ -166,6 +166,19 @@
         </svg>
       </button>
 
+      <!-- Top-Right Stealth History Button & Micro-Status Indicator -->
+      <button
+        id="history-btn"
+        type="button"
+        title="Derniers scans"
+        aria-label="Afficher l'historique des scans"
+        class="absolute top-4 right-10 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer p-1 touch-manipulation"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </button>
+
       <!-- Top-Right Micro-Status Indicator -->
       <div
         id="db-status"
@@ -390,6 +403,30 @@
         </svg>
         <span id="camera-btn-label">Scanner</span>
       </button>
+
+      <!-- Card-Level Glassmorphic History Modal Overlay -->
+      <div
+        id="history-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="history-modal-title"
+        class="absolute inset-0 z-50 hidden flex-col bg-white/90 backdrop-blur-2xl rounded-[2rem] p-6 shadow-2xl"
+      >
+        <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/70">
+          <h2 id="history-modal-title" class="text-base font-bold text-slate-900 tracking-tight">Derniers Scans</h2>
+          <button
+            id="close-history-btn"
+            type="button"
+            aria-label="Fermer l'historique"
+            class="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer touch-manipulation"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div id="history-list" class="flex-1 min-h-0 overflow-y-auto space-y-3 pr-0.5"></div>
+      </div>
     </section>
 
     <!-- Camera Viewport Card -->
@@ -542,6 +579,10 @@
       const exportBtn = document.getElementById("export-btn");
       const exportIconDownload = document.getElementById("export-icon-download");
       const exportIconSpinner = document.getElementById("export-icon-spinner");
+      const historyBtn = document.getElementById("history-btn");
+      const historyModal = document.getElementById("history-modal");
+      const closeHistoryBtn = document.getElementById("close-history-btn");
+      const historyListEl = document.getElementById("history-list");
       const dbStatusEl = document.getElementById("db-status");
       const screenFlashEl = document.getElementById("screen-flash");
 
@@ -597,6 +638,7 @@
         isBusy: false,
         isCameraActive: false,
         isCameraPickerOpen: false,
+        isHistoryModalOpen: false,
         isCameraBusy: false,
         html5QrCode: null,
         autoClearTimer: null,
@@ -605,6 +647,8 @@
         lastKeyTime: 0,
         rapidBurstCount: 0
       };
+
+      let scanHistory = [];
 
       const CAMERA_STORAGE_KEY = "tradifoot_cam";
 
@@ -651,7 +695,7 @@
       }
 
       function focusScannerInput(force = false) {
-        if (state.isCameraActive || state.isCameraPickerOpen) return;
+        if (state.isCameraActive || state.isCameraPickerOpen || state.isHistoryModalOpen) return;
         if (state.mode !== MODE.LOOKUP) return;
         if (!force && !isDesktopPointer()) return;
         if (document.activeElement !== barcodeInput) {
@@ -661,6 +705,7 @@
           if (
             !state.isCameraActive &&
             !state.isCameraPickerOpen &&
+            !state.isHistoryModalOpen &&
             state.mode === MODE.LOOKUP &&
             document.activeElement !== barcodeInput
           ) {
@@ -957,6 +1002,8 @@
           resultSkuEl.classList.toggle("hidden", !state.activeSku);
           stateSuccess.classList.remove("hidden");
 
+          addToScanHistory(state.activeBarcode, state.activeSku, state.activeZone || "NO ZONE");
+
           AudioFeedback.playSuccess();
           triggerCardFlash();
         } catch (err) {
@@ -1034,6 +1081,10 @@
           }
 
           renderStatusReady();
+
+          const historyBarcode = cleanActiveBarcode || cleanActiveSku;
+          const historySku = state.activeSku || cleanActiveBarcode;
+          addToScanHistory(historyBarcode, historySku, newZoneValue);
 
           // Reset to State 1 (Lookup Mode), clear all visible inputs & refocus USB input
           state.mode = MODE.LOOKUP;
@@ -1160,6 +1211,8 @@
           }
 
           renderStatusReady();
+
+          addToScanHistory(cleanUnknownBarcode, skuInputValue, newZoneValue);
 
           // Return to State 1 (Lookup Mode), clear all visible inputs & refocus USB input
           state.mode = MODE.LOOKUP;
@@ -1849,15 +1902,119 @@
 
       exportBtn.addEventListener("click", exportToExcel);
 
+      /**
+       * =========================================================================
+       * 9. STEALTH HISTORY TRACKER & GLASSMORPHIC MODAL
+       * =========================================================================
+       */
+      function addToScanHistory(barcode, sku, zone) {
+        const cleanCode = sanitizeBarcode(barcode);
+        const skuValue = String(sku ?? "").trim() || cleanCode;
+        const zoneValue = String(zone ?? "").trim() || "NO ZONE";
+        scanHistory.unshift({
+          barcode: cleanCode,
+          sku: skuValue,
+          zone: zoneValue,
+          time: new Date().toLocaleTimeString()
+        });
+        scanHistory = scanHistory.slice(0, 10);
+        if (state.isHistoryModalOpen) {
+          renderHistoryList();
+        }
+      }
+
+      function renderHistoryList() {
+        historyListEl.innerHTML = "";
+        if (scanHistory.length === 0) {
+          const emptyEl = document.createElement("p");
+          emptyEl.className = "text-sm font-medium text-slate-400 text-center py-8";
+          emptyEl.textContent = "Aucun historique pour cette session.";
+          historyListEl.appendChild(emptyEl);
+          return;
+        }
+
+        scanHistory.forEach((entry) => {
+          const item = document.createElement("div");
+          item.className = "bg-white rounded-xl px-4 py-3 shadow-sm border border-slate-100 flex items-center justify-between gap-3 text-left";
+
+          const leftCol = document.createElement("div");
+          leftCol.className = "min-w-0 flex-1";
+
+          const skuEl = document.createElement("p");
+          skuEl.className = "text-sm font-bold text-slate-900 truncate";
+          skuEl.textContent = entry.sku || entry.barcode;
+          leftCol.appendChild(skuEl);
+
+          if (entry.barcode && entry.barcode !== entry.sku) {
+            const barcodeEl = document.createElement("p");
+            barcodeEl.className = "text-[11px] font-mono text-slate-400 truncate mt-0.5";
+            barcodeEl.textContent = entry.barcode;
+            leftCol.appendChild(barcodeEl);
+          }
+
+          const rightCol = document.createElement("div");
+          rightCol.className = "shrink-0 text-right";
+
+          const zoneEl = document.createElement("p");
+          zoneEl.className = "text-sm font-bold text-blue-600";
+          zoneEl.textContent = entry.zone;
+          rightCol.appendChild(zoneEl);
+
+          const timeEl = document.createElement("p");
+          timeEl.className = "text-[11px] font-medium text-slate-400 mt-0.5";
+          timeEl.textContent = entry.time;
+          rightCol.appendChild(timeEl);
+
+          item.appendChild(leftCol);
+          item.appendChild(rightCol);
+          historyListEl.appendChild(item);
+        });
+      }
+
+      function openHistoryModal() {
+        AudioFeedback.unlock();
+        historyBtn.blur();
+        barcodeInput.blur();
+        manualZoneInput.blur();
+        newSkuInput.blur();
+        newZoneInput.blur();
+        renderHistoryList();
+        state.isHistoryModalOpen = true;
+        historyModal.classList.remove("hidden");
+        historyModal.classList.add("flex");
+      }
+
+      function closeHistoryModal() {
+        historyModal.classList.add("hidden");
+        historyModal.classList.remove("flex");
+        state.isHistoryModalOpen = false;
+        if (state.mode === MODE.LOOKUP && !state.isCameraActive && !state.isCameraPickerOpen) {
+          focusScannerInput();
+        }
+      }
+
+      historyBtn.addEventListener("click", openHistoryModal);
+      closeHistoryBtn.addEventListener("click", () => {
+        AudioFeedback.unlock();
+        closeHistoryBtn.blur();
+        closeHistoryModal();
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && state.isHistoryModalOpen) {
+          closeHistoryModal();
+        }
+      });
+
       document.addEventListener("click", (e) => {
         AudioFeedback.unlock();
-        if (state.isCameraActive || state.isCameraPickerOpen) return;
-        const interactive = e.target.closest("button, input, select, a, #camera-section, #camera-picker");
+        if (state.isCameraActive || state.isCameraPickerOpen || state.isHistoryModalOpen) return;
+        const interactive = e.target.closest("button, input, select, a, #camera-section, #camera-picker, #history-modal");
         if (!interactive) focusScannerInput();
       });
 
       window.addEventListener("focus", () => {
-        if (!state.isCameraActive && !state.isCameraPickerOpen) {
+        if (!state.isCameraActive && !state.isCameraPickerOpen && !state.isHistoryModalOpen) {
           focusScannerInput();
         }
       });
