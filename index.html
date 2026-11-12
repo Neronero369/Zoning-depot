@@ -100,13 +100,30 @@
   <!-- Full-Screen Flash Overlay for Relocation Confirmation -->
   <div id="screen-flash" class="hidden fixed inset-0 bg-green-500/30 pointer-events-none z-50"></div>
 
-  <main class="w-full max-w-md mx-auto flex flex-col gap-2 max-h-full">
+  <!-- Premium Brand Watermark Layer -->
+  <div
+    aria-hidden="true"
+    class="fixed inset-0 z-0 pointer-events-none overflow-hidden flex items-center justify-between px-4 sm:px-12 opacity-5"
+  >
+    <img
+      src="./Assets/clarks.png"
+      alt="Clarks"
+      class="w-48 sm:w-80 grayscale mix-blend-multiply transform -rotate-12 absolute -bottom-10 -left-10 select-none"
+    />
+    <img
+      src="./Assets/skechers.png"
+      alt="Skechers"
+      class="w-48 sm:w-80 grayscale mix-blend-multiply transform rotate-12 absolute -top-10 -right-10 select-none"
+    />
+  </div>
+
+  <main class="relative z-10 w-full max-w-md mx-auto flex flex-col gap-2 max-h-full">
 
     <!-- Ultra-Minimalist Industrial Scanner Card -->
     <section
       id="main-card"
       aria-label="TRADIFOOT Scanner Zoning"
-      class="relative w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-sm p-4 flex flex-col transition-colors duration-200"
+      class="relative z-10 w-full max-w-md bg-white/95 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-sm p-4 flex flex-col transition-colors duration-200"
     >
       <!-- Top-Left Admin Stealth Excel Export Button -->
       <button
@@ -329,7 +346,7 @@
     <section
       id="camera-section"
       aria-label="Caméra"
-      class="hidden w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-sm p-2.5 overflow-hidden"
+      class="hidden relative z-10 w-full max-w-md bg-white/95 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-sm p-2.5 overflow-hidden"
     >
       <div id="reader" class="w-full"></div>
       <p id="camera-error" class="hidden mt-2 text-center text-xs font-medium text-red-600"></p>
@@ -650,7 +667,7 @@
         state.unknownBarcode = "";
         clearAllVisibleInputs();
         barcodeInput.placeholder = "SKU ou code-barres...";
-        mainCard.className = "relative w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-sm p-4 flex flex-col transition-colors duration-200";
+        mainCard.className = "relative z-10 w-full max-w-md bg-white/95 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-sm p-4 flex flex-col transition-colors duration-200";
         stateIdle.classList.remove("hidden");
         if (!state.isCameraActive) {
           focusScannerInput(forceFocusScanner);
@@ -708,7 +725,7 @@
         relocateValidationError.textContent = "";
         relocateValidationError.classList.add("hidden");
 
-        mainCard.className = "relative w-full max-w-md bg-yellow-50 border-2 border-yellow-400 rounded-2xl shadow-sm p-4 flex flex-col transition-colors duration-200";
+        mainCard.className = "relative z-10 w-full max-w-md bg-yellow-50/95 backdrop-blur-sm border-2 border-yellow-400 rounded-2xl shadow-sm p-4 flex flex-col transition-colors duration-200";
         stateRelocate.classList.remove("hidden");
         triggerCardFlash();
 
@@ -819,7 +836,7 @@
 
           clearAutoResetTimer();
           hideAllResultStates();
-          mainCard.className = "relative w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-sm p-4 flex flex-col transition-colors duration-200";
+          mainCard.className = "relative z-10 w-full max-w-md bg-white/95 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-sm p-4 flex flex-col transition-colors duration-200";
 
           if (error || !data) {
             const isDbError = Boolean(error && error.code !== "PGRST116");
@@ -955,7 +972,7 @@
           barcodeInput.placeholder = "SKU ou code-barres...";
 
           hideAllResultStates();
-          mainCard.className = "relative w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-sm p-4 flex flex-col transition-colors duration-200";
+          mainCard.className = "relative z-10 w-full max-w-md bg-white/95 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-sm p-4 flex flex-col transition-colors duration-200";
           relocatedMessageEl.textContent = `Déplacé vers ${newZoneValue}`;
           stateRelocated.classList.remove("hidden");
           countdownBar.className = "h-full bg-green-500";
@@ -1001,7 +1018,7 @@
         createValidationError.classList.add("hidden");
         createBarcodeBadge.textContent = cleanUnknown;
 
-        mainCard.className = "relative w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-sm p-4 flex flex-col transition-colors duration-200";
+        mainCard.className = "relative z-10 w-full max-w-md bg-white/95 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-sm p-4 flex flex-col transition-colors duration-200";
         stateCreate.classList.remove("hidden");
         triggerCardFlash();
 
@@ -1082,7 +1099,7 @@
           barcodeInput.placeholder = "SKU ou code-barres...";
 
           hideAllResultStates();
-          mainCard.className = "relative w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-sm p-4 flex flex-col transition-colors duration-200";
+          mainCard.className = "relative z-10 w-full max-w-md bg-white/95 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-sm p-4 flex flex-col transition-colors duration-200";
           relocatedMessageEl.textContent = `Créé avec succès dans ${newZoneValue}`;
           stateRelocated.classList.remove("hidden");
           countdownBar.className = "h-full bg-green-500";
