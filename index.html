@@ -238,12 +238,14 @@
           id="brand-logo"
           src="./Assets/tradifoot.png"
           alt="TradiFoot"
-          class="h-8 mx-auto object-contain"
+          title="Réinitialiser / Accueil"
+          class="h-8 mx-auto object-contain cursor-pointer hover:opacity-80 active:scale-95 transition-all touch-manipulation"
           onerror="this.classList.add('hidden'); document.getElementById('brand-fallback').classList.remove('hidden');"
         />
         <h1
           id="brand-fallback"
-          class="hidden text-xl font-black text-slate-900 tracking-tight text-center"
+          title="Réinitialiser / Accueil"
+          class="hidden text-xl font-black text-slate-900 tracking-tight text-center cursor-pointer hover:opacity-80 active:scale-95 transition-all touch-manipulation"
         >
           TRADIFOOT
         </h1>
@@ -2702,7 +2704,7 @@
       document.addEventListener("click", (e) => {
         AudioFeedback.unlock();
         if (state.isCameraActive || state.isCameraPickerOpen || state.isHistoryModalOpen) return;
-        const interactive = e.target.closest("button, input, select, a, #camera-section, #camera-picker, #history-modal");
+        const interactive = e.target.closest("button, input, select, a, #brand-logo, #brand-fallback, #camera-section, #camera-picker, #history-modal");
         if (!interactive) focusScannerInput();
       });
 
@@ -2711,6 +2713,27 @@
           focusScannerInput();
         }
       });
+
+      function resetToHome() {
+        AudioFeedback.unlock();
+        if (state.isCameraActive || state.isCameraPickerOpen) {
+          stopCamera();
+        }
+        state.lastScanCode = "";
+        state.lastScanAt = 0;
+        clearAllVisibleInputs();
+        resetToIdleState(true);
+        triggerCardFlash();
+        triggerHaptic("success");
+      }
+      window.resetToHome = resetToHome;
+
+      if (brandLogo) {
+        brandLogo.addEventListener("click", resetToHome);
+      }
+      if (brandFallback) {
+        brandFallback.addEventListener("click", resetToHome);
+      }
 
       /**
        * =========================================================================
@@ -2744,13 +2767,7 @@
 
         if (deltaX > swipeThreshold) {
           // Swipe Right -> Clear / Next scan (Abort current view & reset to State 1)
-          AudioFeedback.unlock();
-          state.lastScanCode = "";
-          state.lastScanAt = 0;
-          clearAllVisibleInputs();
-          resetToIdleState(true);
-          triggerCardFlash();
-          triggerHaptic("success");
+          resetToHome();
         }
       }
       window.handleSwipe = handleSwipe;
