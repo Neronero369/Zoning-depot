@@ -2458,6 +2458,7 @@
 
           AudioFeedback.playSuccess();
           triggerHaptic("success");
+          speakText("Annulé");
           registerStreak();
         } catch (err) {
           console.error("Erreur annulation Supabase:", err);
@@ -2594,6 +2595,72 @@
           focusScannerInput();
         }
       });
+
+      /**
+       * =========================================================================
+       * 10. GESTURE NAVIGATION (TOUCH SWIPE TO UNDO / CLEAR)
+       * =========================================================================
+       */
+      let touchStartX = 0;
+      let touchEndX = 0;
+      let touchStartY = 0;
+      let touchEndY = 0;
+
+      function handleSwipe() {
+        if (state.isHistoryModalOpen) return;
+
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+        const swipeThreshold = 70;
+
+        if (Math.abs(deltaX) <= swipeThreshold || Math.abs(deltaY) > Math.abs(deltaX)) {
+          return;
+        }
+
+        if (deltaX < -swipeThreshold) {
+          // Swipe Left -> Quick Undo latest eligible relocation
+          const latestItem = scanHistory[0];
+          if (latestItem && !latestItem.undone && latestItem.action === "RELOCATE") {
+            undoAction(0);
+          }
+          return;
+        }
+
+        if (deltaX > swipeThreshold) {
+          // Swipe Right -> Clear / Next scan (Abort current view & reset to State 1)
+          AudioFeedback.unlock();
+          state.lastScanCode = "";
+          state.lastScanAt = 0;
+          clearAllVisibleInputs();
+          resetToIdleState(true);
+          triggerCardFlash();
+          triggerHaptic("success");
+        }
+      }
+      window.handleSwipe = handleSwipe;
+
+      mainCard.addEventListener(
+        "touchstart",
+        (e) => {
+          const touch = e.changedTouches && e.changedTouches[0];
+          if (!touch) return;
+          touchStartX = touch.screenX;
+          touchStartY = touch.screenY;
+        },
+        { passive: true }
+      );
+
+      mainCard.addEventListener(
+        "touchend",
+        (e) => {
+          const touch = e.changedTouches && e.changedTouches[0];
+          if (!touch) return;
+          touchEndX = touch.screenX;
+          touchEndY = touch.screenY;
+          handleSwipe();
+        },
+        { passive: true }
+      );
 
       window.addEventListener("online", handleOnline);
       window.addEventListener("offline", updateNetworkUI);
