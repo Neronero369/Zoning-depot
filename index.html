@@ -487,9 +487,21 @@
 
       /**
        * =========================================================================
-       * 2. AUDIO FEEDBACK ENGINE (Synthesized Web Audio API)
+       * 2. AUDIO & HAPTIC FEEDBACK ENGINES (Web Audio API + Vibration API)
        * =========================================================================
        */
+      function triggerHaptic(type) {
+        try {
+          if (typeof navigator === "undefined" || !navigator.vibrate) return;
+          if (type === "success") {
+            navigator.vibrate([50, 50, 50]);
+          } else if (type === "error") {
+            navigator.vibrate([200, 100, 200, 100, 200]);
+          }
+        } catch (_) {}
+      }
+      window.triggerHaptic = triggerHaptic;
+
       const AudioFeedback = (() => {
         let ctx = null;
 
@@ -531,14 +543,12 @@
             try {
               playTone(987.77, 0.0, 0.075, "sine", 0.25);
               playTone(1318.51, 0.075, 0.11, "sine", 0.28);
-              if (navigator.vibrate) navigator.vibrate(70);
             } catch (_) {}
           },
           playError() {
             try {
               playTone(155, 0.0, 0.12, "sawtooth", 0.22);
               playTone(125, 0.15, 0.18, "sawtooth", 0.22);
-              if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
             } catch (_) {}
           }
         };
@@ -964,6 +974,7 @@
             stateError.classList.remove("hidden");
             countdownBar.className = "h-full bg-red-500";
             AudioFeedback.playError();
+            triggerHaptic("error");
             if (isDbError) {
               state.unknownBarcode = "";
               addArticleBtn.classList.add("hidden");
@@ -1005,6 +1016,7 @@
           addToScanHistory(state.activeBarcode, state.activeSku, state.activeZone || "NO ZONE");
 
           AudioFeedback.playSuccess();
+          triggerHaptic("success");
           triggerCardFlash();
         } catch (err) {
           console.error("Erreur lecture Supabase:", err);
@@ -1016,6 +1028,7 @@
           stateError.classList.remove("hidden");
           countdownBar.className = "h-full bg-red-500";
           AudioFeedback.playError();
+          triggerHaptic("error");
           triggerCardFlash();
           scheduleAutoClear();
         } finally {
@@ -1045,6 +1058,7 @@
           relocateValidationError.textContent = "Veuillez saisir la nouvelle zone";
           relocateValidationError.classList.remove("hidden");
           AudioFeedback.playError();
+          triggerHaptic("error");
           triggerCardFlash();
           focusManualField(manualZoneInput);
           return;
@@ -1076,6 +1090,7 @@
             relocateValidationError.textContent = `Erreur: ${msg}`;
             relocateValidationError.classList.remove("hidden");
             AudioFeedback.playError();
+            triggerHaptic("error");
             triggerCardFlash();
             return;
           }
@@ -1104,6 +1119,7 @@
           countdownBar.className = "h-full bg-green-500";
 
           AudioFeedback.playSuccess();
+          triggerHaptic("success");
           triggerScreenGreenFlash();
           triggerCardFlash();
           focusScannerInput(true);
@@ -1114,6 +1130,7 @@
           relocateValidationError.textContent = "Erreur réseau — réessayez";
           relocateValidationError.classList.remove("hidden");
           AudioFeedback.playError();
+          triggerHaptic("error");
           triggerCardFlash();
         } finally {
           state.isBusy = false;
@@ -1168,6 +1185,7 @@
           createValidationError.textContent = "Veuillez saisir le SKU";
           createValidationError.classList.remove("hidden");
           AudioFeedback.playError();
+          triggerHaptic("error");
           triggerCardFlash();
           focusManualField(newSkuInput);
           return;
@@ -1178,6 +1196,7 @@
           createValidationError.textContent = "Veuillez saisir la zone de rangement";
           createValidationError.classList.remove("hidden");
           AudioFeedback.playError();
+          triggerHaptic("error");
           triggerCardFlash();
           focusManualField(newZoneInput);
           return;
@@ -1206,6 +1225,7 @@
             createValidationError.textContent = msg;
             createValidationError.classList.remove("hidden");
             AudioFeedback.playError();
+            triggerHaptic("error");
             triggerCardFlash();
             return;
           }
@@ -1233,6 +1253,7 @@
           countdownBar.className = "h-full bg-green-500";
 
           AudioFeedback.playSuccess();
+          triggerHaptic("success");
           triggerScreenGreenFlash();
           triggerCardFlash();
           focusScannerInput(true);
@@ -1244,6 +1265,7 @@
           createValidationError.textContent = msg;
           createValidationError.classList.remove("hidden");
           AudioFeedback.playError();
+          triggerHaptic("error");
           triggerCardFlash();
         } finally {
           state.isBusy = false;
