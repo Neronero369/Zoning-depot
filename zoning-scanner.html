@@ -95,6 +95,14 @@
     .animate-screen-green {
       animation: screenSuccessFlash 650ms ease-out forwards;
     }
+    @keyframes streakBump {
+      0% { transform: translateX(-50%) scale(1); }
+      45% { transform: translateX(-50%) scale(1.16); }
+      100% { transform: translateX(-50%) scale(1); }
+    }
+    .animate-streak-bump {
+      animation: streakBump 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
   </style>
 </head>
 <body class="bg-gradient-to-b from-slate-50 to-slate-100 font-sans text-slate-900 h-screen w-screen overflow-hidden flex items-center justify-center p-2 sm:p-4 antialiased">
@@ -208,21 +216,28 @@
         <span class="block w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
       </div>
 
-      <!-- TradiFoot Brand Header -->
-      <header>
+      <!-- TradiFoot Brand Header & Flow State Streak Badge -->
+      <header class="relative mb-5">
         <img
           id="brand-logo"
           src="./Assets/tradifoot.png"
           alt="TradiFoot"
-          class="h-8 mx-auto mb-4 object-contain"
+          class="h-8 mx-auto object-contain"
           onerror="this.classList.add('hidden'); document.getElementById('brand-fallback').classList.remove('hidden');"
         />
         <h1
           id="brand-fallback"
-          class="hidden text-xl font-black text-slate-900 tracking-tight text-center mb-4"
+          class="hidden text-xl font-black text-slate-900 tracking-tight text-center"
         >
           TRADIFOOT
         </h1>
+        <div
+          id="streak-badge"
+          aria-live="polite"
+          class="absolute top-9 left-1/2 transform -translate-x-1/2 flex items-center gap-1.5 px-3 py-1 bg-orange-50/90 backdrop-blur-md border border-orange-200 text-orange-600 rounded-full text-sm font-bold shadow-sm transition-all duration-500 opacity-0 scale-90 pointer-events-none z-20"
+        >
+          🔥 <span id="streak-count-text">x2</span>
+        </div>
       </header>
 
       <!-- Dynamic Result & State Machine Card Area -->
@@ -627,6 +642,8 @@
 
       const brandLogo = document.getElementById("brand-logo");
       const brandFallback = document.getElementById("brand-fallback");
+      const streakBadge = document.getElementById("streak-badge");
+      const streakCountText = document.getElementById("streak-count-text");
       const mainCard = document.getElementById("main-card");
       const exportBtn = document.getElementById("export-btn");
       const exportIconDownload = document.getElementById("export-icon-download");
@@ -705,6 +722,33 @@
       };
 
       let scanHistory = [];
+      let streakCount = 0;
+      let streakTimer = null;
+
+      function resetStreak() {
+        streakCount = 0;
+        if (streakTimer) {
+          clearTimeout(streakTimer);
+          streakTimer = null;
+        }
+        streakBadge.classList.remove("opacity-100", "scale-100", "animate-streak-bump");
+        streakBadge.classList.add("opacity-0", "scale-90");
+      }
+      window.resetStreak = resetStreak;
+
+      function registerStreak() {
+        streakCount += 1;
+        if (streakTimer) clearTimeout(streakTimer);
+        streakTimer = setTimeout(() => resetStreak(), 60000);
+
+        if (streakCount > 1) {
+          streakCountText.innerText = "x" + streakCount;
+          streakBadge.classList.remove("opacity-0", "scale-90", "animate-streak-bump");
+          void streakBadge.offsetWidth;
+          streakBadge.classList.add("opacity-100", "scale-100", "animate-streak-bump");
+        }
+      }
+      window.registerStreak = registerStreak;
 
       const CAMERA_STORAGE_KEY = "tradifoot_cam";
 
@@ -1072,6 +1116,7 @@
           AudioFeedback.playSuccess();
           triggerHaptic("success");
           speakText(spokenZone);
+          registerStreak();
           triggerCardFlash();
         } catch (err) {
           console.error("Erreur lecture Supabase:", err);
@@ -1185,6 +1230,7 @@
           AudioFeedback.playSuccess();
           triggerHaptic("success");
           speakText("Déplacé");
+          registerStreak();
           triggerScreenGreenFlash();
           triggerCardFlash();
           focusScannerInput(true);
@@ -1325,6 +1371,7 @@
           AudioFeedback.playSuccess();
           triggerHaptic("success");
           speakText("Créé");
+          registerStreak();
           triggerScreenGreenFlash();
           triggerCardFlash();
           focusScannerInput(true);
@@ -2129,6 +2176,7 @@
 
           AudioFeedback.playSuccess();
           triggerHaptic("success");
+          registerStreak();
         } catch (err) {
           console.error("Erreur annulation Supabase:", err);
           renderStatusError(err?.message);
