@@ -2751,17 +2751,22 @@
       let touchEndX = 0;
       let touchStartY = 0;
       let touchEndY = 0;
-      let isSwipeActive = false;
 
       function handleSwipe(e) {
-        if (e && e.target && typeof e.target.closest === "function" && e.target.closest("button")) {
+        if (!e || !e.target) return;
+        const targetEl = e.target.nodeType === 3 ? e.target.parentElement : e.target;
+        if (
+          (targetEl.closest && targetEl.closest("button")) ||
+          targetEl.tagName === "INPUT" ||
+          (targetEl.closest && targetEl.closest("input"))
+        ) {
           return;
         }
         if (state.isHistoryModalOpen) return;
 
         const deltaX = touchEndX - touchStartX;
         const deltaY = touchEndY - touchStartY;
-        const swipeThreshold = 70;
+        const swipeThreshold = 75;
 
         if (Math.abs(deltaX) <= swipeThreshold || Math.abs(deltaY) > Math.abs(deltaX)) {
           return;
@@ -2771,6 +2776,7 @@
           // Swipe Left -> Quick Undo latest eligible relocation
           const latestItem = scanHistory[0];
           if (latestItem && !latestItem.undone && latestItem.action === "RELOCATE") {
+            triggerHaptic("success");
             undoAction(0);
           }
           return;
@@ -2786,16 +2792,17 @@
       mainCard.addEventListener(
         "touchstart",
         (e) => {
-          if (e.target && typeof e.target.closest === "function" && e.target.closest("button")) {
-            isSwipeActive = false;
+          const targetEl = e.target && e.target.nodeType === 3 ? e.target.parentElement : e.target;
+          if (
+            targetEl &&
+            ((targetEl.closest && targetEl.closest("button")) ||
+              targetEl.tagName === "INPUT" ||
+              (targetEl.closest && targetEl.closest("input")))
+          ) {
             return;
           }
           const touch = e.changedTouches && e.changedTouches[0];
-          if (!touch) {
-            isSwipeActive = false;
-            return;
-          }
-          isSwipeActive = true;
+          if (!touch) return;
           touchStartX = touch.screenX;
           touchStartY = touch.screenY;
         },
@@ -2805,12 +2812,15 @@
       mainCard.addEventListener(
         "touchend",
         (e) => {
-          if (e.target && typeof e.target.closest === "function" && e.target.closest("button")) {
-            isSwipeActive = false;
+          const targetEl = e.target && e.target.nodeType === 3 ? e.target.parentElement : e.target;
+          if (
+            targetEl &&
+            ((targetEl.closest && targetEl.closest("button")) ||
+              targetEl.tagName === "INPUT" ||
+              (targetEl.closest && targetEl.closest("input")))
+          ) {
             return;
           }
-          if (!isSwipeActive) return;
-          isSwipeActive = false;
           const touch = e.changedTouches && e.changedTouches[0];
           if (!touch) return;
           touchEndX = touch.screenX;
