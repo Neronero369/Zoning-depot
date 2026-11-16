@@ -487,19 +487,7 @@
         class="absolute inset-0 z-50 hidden flex-col bg-white/90 backdrop-blur-2xl rounded-[2rem] p-6 shadow-2xl"
       >
         <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/70">
-          <div class="flex items-center gap-2 min-w-0">
-            <h2 id="history-modal-title" class="text-base font-bold text-slate-900 tracking-tight">Derniers Scans</h2>
-            <button
-              id="clerk-badge-btn"
-              type="button"
-              title="Changer l'identifiant du préparateur"
-              aria-label="Changer l'identifiant du préparateur"
-              class="inline-flex items-center gap-1 rounded-full bg-slate-100/90 hover:bg-slate-200/90 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 transition-colors cursor-pointer touch-manipulation"
-            >
-              <span aria-hidden="true">👤</span>
-              <span id="clerk-badge-label">INCONNU</span>
-            </button>
-          </div>
+          <h2 id="history-modal-title" class="text-base font-bold text-slate-900 tracking-tight">Derniers Scans</h2>
           <button
             id="close-history-btn"
             type="button"
@@ -712,8 +700,6 @@
       const closeHistoryBtn = document.getElementById("close-history-btn");
       const historyToastEl = document.getElementById("history-toast");
       const historyListEl = document.getElementById("history-list");
-      const clerkBadgeBtn = document.getElementById("clerk-badge-btn");
-      const clerkBadgeLabel = document.getElementById("clerk-badge-label");
       const dbStatusEl = document.getElementById("db-status");
       const screenFlashEl = document.getElementById("screen-flash");
 
@@ -888,8 +874,7 @@
               const payload = {
                 barcode: item.barcode,
                 zone: item.zone,
-                last_updated_at: item.timestamp || new Date().toISOString(),
-                clerk_id: item.clerk_id || clerkId || "INCONNU"
+                last_updated_at: item.timestamp || new Date().toISOString()
               };
               if (item.sku) {
                 payload.sku = item.sku;
@@ -932,75 +917,6 @@
       window.updateNetworkUI = updateNetworkUI;
       window.handleOnline = handleOnline;
       window.getOfflineQueue = () => offlineQueue.slice();
-
-      const CLERK_STORAGE_KEY = "tradifoot_clerk_id";
-      const CLERK_PROMPT_MESSAGE = "Veuillez entrer vos initiales ou votre prénom (ex: SB, Amin) :";
-      let clerkId = "INCONNU";
-
-      try {
-        const storedClerkId = localStorage.getItem(CLERK_STORAGE_KEY);
-        if (storedClerkId && storedClerkId.trim()) {
-          clerkId = storedClerkId.trim().toUpperCase();
-        }
-      } catch (_storageErr) {
-        clerkId = "INCONNU";
-      }
-
-      function updateClerkBadgeUI() {
-        const resolved = clerkId || "INCONNU";
-        if (clerkBadgeLabel) {
-          clerkBadgeLabel.textContent = resolved;
-        }
-        if (clerkBadgeBtn) {
-          clerkBadgeBtn.title = `Préparateur actif : ${resolved} (cliquer pour modifier)`;
-        }
-      }
-
-      function promptClerkId(forcePrompt = false) {
-        let existing = "";
-        try {
-          existing = (localStorage.getItem(CLERK_STORAGE_KEY) || "").trim().toUpperCase();
-        } catch (_storageErr) {
-          existing = "";
-        }
-
-        if (existing && !forcePrompt) {
-          clerkId = existing;
-          updateClerkBadgeUI();
-          return clerkId;
-        }
-
-        if (typeof window.prompt === "function") {
-          const defaultVal = existing || (clerkId && clerkId !== "INCONNU" ? clerkId : "");
-          const userInput = forcePrompt
-            ? window.prompt(CLERK_PROMPT_MESSAGE, defaultVal)
-            : window.prompt(CLERK_PROMPT_MESSAGE);
-          const normalized = typeof userInput === "string" ? userInput.trim().toUpperCase() : "";
-          if (normalized) {
-            clerkId = normalized;
-            try {
-              localStorage.setItem(CLERK_STORAGE_KEY, clerkId);
-            } catch (_storageErr) {
-              // Ignore storage quota / privacy errors safely
-            }
-          } else if (!existing) {
-            clerkId = "INCONNU";
-          }
-        } else if (!existing) {
-          clerkId = "INCONNU";
-        }
-
-        updateClerkBadgeUI();
-        return clerkId;
-      }
-
-      function initClerkIdentity() {
-        return promptClerkId(false);
-      }
-
-      window.initClerkIdentity = initClerkIdentity;
-      window.promptClerkId = promptClerkId;
-      window.getClerkId = () => clerkId;
 
       const CAMERA_STORAGE_KEY = "tradifoot_cam";
 
@@ -1458,8 +1374,7 @@
             offlineQueue.push({
               barcode: offlineBarcode,
               zone: newZoneValue,
-              timestamp: new Date().toISOString(),
-              clerk_id: clerkId || "INCONNU"
+              timestamp: new Date().toISOString()
             });
             saveQueue();
 
@@ -1502,8 +1417,7 @@
 
           const payload = {
             zone: newZoneValue,
-            last_updated_at: new Date().toISOString(),
-            clerk_id: clerkId || "INCONNU"
+            last_updated_at: new Date().toISOString()
           };
 
           const query =
@@ -1657,8 +1571,7 @@
               barcode: cleanUnknownBarcode,
               sku: skuInputValue,
               zone: newZoneValue,
-              timestamp: new Date().toISOString(),
-              clerk_id: clerkId || "INCONNU"
+              timestamp: new Date().toISOString()
             });
             saveQueue();
 
@@ -1702,8 +1615,7 @@
             .insert({
               barcode: cleanUnknownBarcode,
               sku: skuInputValue,
-              zone: newZoneValue,
-              clerk_id: clerkId || "INCONNU"
+              zone: newZoneValue
             });
 
           if (error) {
@@ -2539,8 +2451,7 @@
             .from("warehouse_zoning")
             .update({
               zone: item.oldZone,
-              last_updated_at: new Date().toISOString(),
-              clerk_id: clerkId || "INCONNU"
+              last_updated_at: new Date().toISOString()
             });
 
           const query = useSkuKey
@@ -2690,12 +2601,6 @@
         e.stopPropagation();
         openHistoryModal();
       });
-      if (clerkBadgeBtn) {
-        clerkBadgeBtn.addEventListener("click", () => {
-          AudioFeedback.unlock();
-          promptClerkId(true);
-        });
-      }
       closeHistoryBtn.addEventListener("click", () => {
         AudioFeedback.unlock();
         closeHistoryBtn.blur();
@@ -2842,7 +2747,6 @@
           brandLogo.classList.add("hidden");
           brandFallback.classList.remove("hidden");
         }
-        initClerkIdentity();
         updateNetworkUI();
         renderStatusReady();
         focusScannerInput();
